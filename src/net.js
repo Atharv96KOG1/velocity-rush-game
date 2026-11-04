@@ -1,23 +1,32 @@
-// Online play over WebRTC data channels (PeerJS). One player hosts a room; everyone
-// connects to the host, which relays messages (star topology). PeerJS's public
-// broker is only used to set up connections; race traffic goes peer-to-peer.
+// Online play. One player hosts a room; everyone connects to the host, which relays
+// messages (star topology). Three transports carry the same messages:
+//  - direct: WebRTC data channels via PeerJS (lowest latency, but strict NATs and
+//    office/school/mobile networks can block it)
+//  - cloud:  a public MQTT broker over secure WebSockets, used automatically when a
+//    direct connection can't be made
+//  - lan:    the WebSocket relay in serve.py, for players on the same network
 
 const PEER_URL = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
+const MQTT_URL = 'https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js';
+const BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt', 'wss://test.mosquitto.org:8081/mqtt'];
+const TOPIC = 'velocity-rush-game/v1/';
+const DIRECT_TIMEOUT = 9000;
 const PREFIX = 'velocity-rush-room-';
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export const MAX_PLAYERS = 6;
 
-let loading = null;
-function loadPeer() {
-  if (window.Peer) return Promise.resolve();
-  return loading ??= new Promise((resolve, reject) => {
+const loading = {};
+function loadScript(url, global) {
+  if (window[global]) return Promise.resolve();
+  return loading[url] ??= new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = PEER_URL;
+    s.src = url;
     s.onload = resolve;
-    s.onerror = () => { loading = null; reject(new Error('Could not load the networking library. Are you online?')); };
+    s.onerror = () => { delete loading[url]; reject(new Error('Could not load the networking library. Are you online?')); };
     document.head.appendChild(s);
   });
 }
+const loadPeer = () => loadScript(PEER_URL, 'Peer');
 
 const makeCode = () => Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
 const cleanName = n => String(n ?? 'Racer').replace(/[^\w \-]/g, '').trim().slice(0, 12) || 'Racer';
@@ -80,27 +89,103 @@ class RelayHostPeer extends Emitter {
   destroy() { this.destroyed = true; this.ws.close(); }
 }
 
+// ---------- Cloud relay transport (MQTT over WSS) ----------
+// Topics per room: <base>/host (retained "up" while the host is online),
+// <base>/h/<cid> client -> host, <base>/c/<cid> host -> client.
+
+async function mqttConnect(will) {
+  await loadScript(MQTT_URL, 'mqtt');
+  let last;
+  for (const url of BROKERS) {
+    try {
+      return await new Promise((resolve, reject) => {
+        const c = window.mqtt.connect(url, { will, connectTimeout: 6000, reconnectPeriod: 2000, clean: true, keepalive: 20 });
+        const t = setTimeout(() => { c.end(true); reject(new Error('timeout')); }, 7000);
+        c.once('connect', () => { clearTimeout(t); resolve(c); });
+        c.once('error', e => { clearTimeout(t); c.end(true); reject(e); });
+      });
+    } catch (e) { last = e; }
+  }
+  throw new Error(`Cloud relay not reachable (${last?.message ?? 'blocked'}).`);
+}
+
+const text = buf => (typeof buf === 'string' ? buf : new TextDecoder().decode(buf));
+const pub = (client, topic, data, opts) => client.publish(topic, typeof data === 'string' ? data : JSON.stringify(data), opts);
+
+class CloudHostPeer extends Emitter {
+  constructor(client, code) {
+    super();
+    const base = this.base = TOPIC + code;
+    this.client = client;
+    this.conns = new Map();
+    client.subscribe(base + '/h/+', { qos: 0 });
+    pub(client, base + '/host', 'up', { retain: true, qos: 1 });
+    client.on('message', (topic, buf) => {
+      const cid = topic.slice(topic.lastIndexOf('/') + 1);
+      let m;
+      try { m = JSON.parse(text(buf)); } catch { return; }
+      let c = this.conns.get(cid);
+      if (m.t === 'bye') {
+        if (c) { this.conns.delete(cid); c.open = false; c.emit('close'); }
+        return;
+      }
+      if (!c) {
+        if (m.t !== 'hello') return;
+        c = new FakeConn(d => pub(client, base + '/c/' + cid, d));
+        this.conns.set(cid, c);
+        this.emit('connection', c);
+      }
+      c.emit('data', m);
+    });
+  }
+  destroy() {
+    pub(this.client, this.base + '/host', '', { retain: true, qos: 1 });
+    setTimeout(() => this.client.end(), 300);
+  }
+}
+
 // Messages relayed by the host to every other client.
 const RELAY = new Set(['s', 'pw']);
 
 export class NetHost extends Emitter {
+  /** Internet room: listens for direct (WebRTC) and cloud-relay joins under the same code. */
   static async create(me) {
-    await loadPeer();
-    for (let tries = 0; tries < 4; tries++) {
-      const code = makeCode();
-      try {
-        const peer = await new Promise((resolve, reject) => {
-          const p = new window.Peer(PREFIX + code);
-          p.once('open', () => resolve(p));
-          p.once('error', e => { p.destroy(); reject(e); });
-        });
-        return new NetHost(peer, code, me);
-      } catch (e) {
-        if (e.type !== 'unavailable-id') throw new Error(`Could not create room (${e.type ?? e.message})`);
+    let code = makeCode(), peer = null, cloud = null;
+    try {
+      await loadPeer();
+      for (let tries = 0; tries < 4 && !peer; tries++) {
+        try {
+          peer = await new Promise((resolve, reject) => {
+            const p = new window.Peer(PREFIX + code);
+            const t = setTimeout(() => { p.destroy(); reject(new Error('timeout')); }, 8000);
+            p.once('open', () => { clearTimeout(t); resolve(p); });
+            p.once('error', e => { clearTimeout(t); p.destroy(); reject(e); });
+          });
+        } catch (e) {
+          if (e.type !== 'unavailable-id') break;
+          code = makeCode();
+        }
       }
+    } catch { /* direct connections unavailable; the cloud relay may still work */ }
+    const openCloud = () => mqttConnect({ topic: TOPIC + code + '/host', payload: '', retain: true, qos: 1 })
+      .then(client => new CloudHostPeer(client, code));
+    if (peer) {
+      const host = new NetHost(peer, code, me);
+      // The cloud relay attaches in the background so creating a room never waits on it.
+      openCloud().then(cloud => { if (host.closed) cloud.destroy(); else { host.addPeer(cloud); host.emit('lobby'); } }).catch(() => {});
+      return host;
     }
-    throw new Error('Could not create a room. Try again.');
+    try {
+      cloud = await openCloud();
+    } catch {
+      throw new Error('Could not create a room: your network blocks both direct and relay connections.');
+    }
+    const host = new NetHost(cloud, code, me);
+    host.transport = 'cloud';
+    return host;
   }
+
+  get relayReady() { return this.peers.some(p => p instanceof CloudHostPeer); }
 
   static async createRelay(me) {
     const ws = await openSocket(relayUrl());
@@ -126,8 +211,14 @@ export class NetHost extends Emitter {
     this.conns = new Map();
     this.nextId = 1;
     this.inRace = false;
+    this.peers = [];
+    this.addPeer(peer);
+  }
+
+  addPeer(peer) {
+    this.peers.push(peer);
     peer.on('connection', conn => this.accept(conn));
-    peer.on('disconnected', () => { if (!peer.destroyed) peer.reconnect(); });
+    peer.on('disconnected', () => { if (!peer.destroyed) peer.reconnect?.(); });
   }
 
   accept(conn) {
@@ -181,21 +272,69 @@ export class NetHost extends Emitter {
 
   setSettings(s) { this.settings = s; this.syncLobby(); }
   updateMe(me) { Object.assign(this.players[0], me); this.syncLobby(); }
-  close() { this.broadcast({ t: 'closed' }); setTimeout(() => this.peer.destroy(), 200); }
+  close() { this.closed = true; this.broadcast({ t: 'closed' }); setTimeout(() => this.peers.forEach(p => p.destroy()), 200); }
 }
 
 export class NetClient extends Emitter {
-  /** Try the local relay first (if this page came from serve.py), then peer-to-peer. */
-  static async join(code, me) {
+  /** Local relay (when served by serve.py), then a direct connection, then the cloud relay. */
+  static async join(code, me, status = () => {}) {
     code = code.trim().toUpperCase();
     if (location.protocol === 'http:') {
       try {
+        status('Looking for the room on this network…');
         return await NetClient.joinRelay(code, me);
       } catch (e) {
         if (e.fatal) throw e;
       }
     }
-    return NetClient.joinP2P(code, me);
+    let direct;
+    try {
+      status('Connecting directly…');
+      return await NetClient.joinP2P(code, me);
+    } catch (e) {
+      if (e.fatal) throw e;
+      direct = e;
+    }
+    try {
+      status('Direct connection blocked. Connecting through the cloud relay…');
+      return await NetClient.joinCloud(code, me);
+    } catch (e) {
+      if (e.fatal) throw e;
+      throw new Error(`${e.message} (Direct: ${direct.message})`);
+    }
+  }
+
+  static async joinCloud(code, me) {
+    const cid = Math.random().toString(36).slice(2, 10);
+    const base = TOPIC + code, up = base + '/h/' + cid;
+    const client = await mqttConnect({ topic: up, payload: JSON.stringify({ t: 'bye' }), qos: 0, retain: false });
+    return new Promise((resolve, reject) => {
+      let done = false, hostSeen = false;
+      const conn = new FakeConn(d => pub(client, up, d), () => { pub(client, up, { t: 'bye' }); setTimeout(() => client.end(), 200); });
+      const peer = { destroy: () => conn.close(), on() {} };
+      const fail = (err, fatal = false) => { if (done) return; done = true; client.end(true); err.fatal = fatal; reject(err); };
+      setTimeout(() => fail(new Error(hostSeen ? 'The host did not answer.' : `Room ${code} not found.`)), 8000);
+      client.on('message', (topic, buf) => {
+        const body = text(buf);
+        if (topic === base + '/host') {
+          if (body === 'up' && !hostSeen) {
+            hostSeen = true;
+            conn.send({ t: 'hello', name: me.name, car: me.car, power: me.power, paint: me.paint });
+          } else if (body !== 'up' && done && conn.open) { conn.open = false; conn.emit('close'); }
+          return;
+        }
+        let d;
+        try { d = JSON.parse(body); } catch { return; }
+        if (!done && d.t === 'welcome') {
+          done = true;
+          const c = new NetClient(peer, conn, code, d.id);
+          c.transport = 'cloud';
+          resolve(c);
+        } else if (!done && d.t === 'reject') fail(new Error(d.reason), true);
+        else if (done) conn.emit('data', d);
+      });
+      client.subscribe([base + '/c/' + cid, base + '/host'], { qos: 0 });
+    });
   }
 
   static async joinRelay(code, me) {
@@ -238,7 +377,7 @@ export class NetClient extends Emitter {
         peer.destroy();
         reject(err);
       };
-      const timer = setTimeout(() => fail(new Error('Connection timed out. Check the room code, or your network may block peer-to-peer connections.')), 15000);
+      const timer = setTimeout(() => fail(new Error('Direct connection timed out.')), DIRECT_TIMEOUT);
       peer.on('error', e => fail(new Error(e.type === 'peer-unavailable' ? `Room ${code} not found.` : `Network error (${e.type ?? e.message})`)));
       peer.on('open', () => {
         const conn = peer.connect(PREFIX + code, { reliable: true });
@@ -251,7 +390,9 @@ export class NetClient extends Emitter {
             resolve(new NetClient(peer, conn, code, msg.id));
           } else if (msg.t === 'reject') {
             clearTimeout(timer);
-            fail(new Error(msg.reason));
+            const err = new Error(msg.reason);
+            err.fatal = true;
+            fail(err);
           }
         });
       });

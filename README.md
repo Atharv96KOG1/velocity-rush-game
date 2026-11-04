@@ -184,7 +184,7 @@ Open **Online Multiplayer**, enter a name, and pick a connection type:
 
 | Option | When to use | How friends join |
 |---|---|---|
-| **Host Online Room** | Players in different places | They open the game anywhere and enter the 5-letter code |
+| **Host Online Room** | Players in different places | They open the game anywhere and enter the 5-letter code. If a direct connection is blocked, the game switches to the cloud relay automatically. |
 | **Host on Local Network** | Same Wi-Fi, or networks that block peer-to-peer | They open `http://<host-ip>:8000` (printed by `serve.py`) and enter the code |
 
 When joining, the game tries the local relay first and then the internet. The host picks the track, mode, format, laps, AI fill and difficulty in the lobby, and everyone returns there after each race.
@@ -195,10 +195,10 @@ When joining, the game tries the local relay first and then the internet. The ho
 - **Local authority.** Each browser simulates its own car and broadcasts its state 20 times a second. Remote cars are smoothed and extrapolated between updates.
 - **Host authority.** The host simulates the AI, runs knockout eliminations and decides when the race ends, so every player sees the same results.
 - **Powers as events.** When a power fires, every browser plays the effect and applies it to the cars it owns.
-- **Transports.** Internet rooms use WebRTC data channels through [PeerJS](https://peerjs.com/), whose public broker is only used to connect players. LAN rooms use the WebSocket relay in `serve.py`.
+- **Transports.** Internet rooms first try WebRTC data channels through [PeerJS](https://peerjs.com/) (direct, lowest latency). If a strict router, mobile hotspot or office network blocks that, the joiner falls back to a cloud relay: public MQTT brokers over secure WebSockets (EMQX, HiveMQ, Mosquitto). LAN rooms use the WebSocket relay in `serve.py`. Game traffic on the public relay is not encrypted end to end, so don't put personal information in player names.
 
 > [!TIP]
-> If players far apart can't connect, a strict NAT is usually blocking peer-to-peer. Use a LAN room, or configure PeerJS with a TURN server.
+> If joining still fails, the joiner's network is likely blocking the relay ports too (8084, 8884 and 8081). Try a different network, such as a phone hotspot, or play on the same Wi-Fi with a LAN room.
 
 ## Architecture
 

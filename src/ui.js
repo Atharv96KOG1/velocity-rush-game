@@ -199,7 +199,7 @@ export class UI {
       const code = codeIn.value.trim().toUpperCase();
       if (code.length !== 5) { status.className = 'net-status err'; status.textContent = 'Enter the 5-character room code.'; return; }
       busy(`Joining room ${code}…`);
-      try { this.attachNet(await NetClient.join(code, this.me())); } catch (e) { fail(e); }
+      try { this.attachNet(await NetClient.join(code, this.me(), msg => { status.textContent = msg; })); } catch (e) { fail(e); }
     };
     node.querySelector('[data-join]').onclick = join;
     codeIn.addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
@@ -245,7 +245,7 @@ export class UI {
     const tooMany = f => TEAM_SIZE[f] && players.length > TEAM_SIZE[f] * 2;
     const node = this.mount(`<div class="screen full">${this.credits()}
       <div class="h2">LOBBY</div>
-      <div class="room-code">ROOM <b>${net.code}</b> <button class="chip" data-copy>Copy</button> <span class="tag">${net.transport === 'lan' ? 'LOCAL NETWORK · ' + esc(location.host) : 'INTERNET'}</span></div>
+      <div class="room-code">ROOM <b>${net.code}</b> <button class="chip" data-copy>Copy</button> <span class="tag">${{ lan: 'LOCAL NETWORK · ' + esc(location.host), cloud: 'INTERNET · CLOUD RELAY', p2p: net.role === 'host' ? (net.relayReady ? 'INTERNET · DIRECT + RELAY' : 'INTERNET · DIRECT') : 'INTERNET · DIRECT' }[net.transport]}</span></div>
       <div class="desc">${host ? 'Share this code with friends. Start when everyone is in.' : 'Waiting for the host to start the race…'}</div>
       <div class="label">Players ${players.length}/${MAX_PLAYERS}</div>
       <div class="players">${players.map(p => `<div class="player ${p.id === net.localId ? 'me' : ''}">
