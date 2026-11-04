@@ -121,7 +121,7 @@ export class NetHost extends Emitter {
     this.peer = peer;
     this.code = code;
     this.localId = 'p0';
-    this.players = [{ id: 'p0', name: cleanName(me.name), car: me.car, power: me.power, host: true }];
+    this.players = [{ id: 'p0', name: cleanName(me.name), car: me.car, power: me.power, paint: me.paint, host: true }];
     this.settings = null;
     this.conns = new Map();
     this.nextId = 1;
@@ -141,7 +141,7 @@ export class NetHost extends Emitter {
         const id = 'p' + this.nextId++;
         conn.pid = id;
         this.conns.set(id, conn);
-        this.players.push({ id, name: cleanName(msg.name), car: msg.car, power: msg.power });
+        this.players.push({ id, name: cleanName(msg.name), car: msg.car, power: msg.power, paint: msg.paint });
         conn.send({ t: 'welcome', id, code: this.code });
         this.syncLobby();
         return;
@@ -150,7 +150,7 @@ export class NetHost extends Emitter {
       msg.from = conn.pid;
       if (msg.t === 'me') {
         const p = this.players.find(x => x.id === conn.pid);
-        if (p) { p.car = msg.car; p.power = msg.power; }
+        if (p) { p.car = msg.car; p.power = msg.power; p.paint = msg.paint; }
         this.syncLobby();
         return;
       }
@@ -206,7 +206,7 @@ export class NetClient extends Emitter {
       ws.onmessage = e => {
         const m = JSON.parse(e.data);
         if (m.op === 'error') fail(new Error(m.reason));
-        else if (m.op === 'joined') { joined = true; conn.send({ t: 'hello', name: me.name, car: me.car, power: me.power }); }
+        else if (m.op === 'joined') { joined = true; conn.send({ t: 'hello', name: me.name, car: me.car, power: me.power, paint: me.paint }); }
         else if (m.op === 'closed') { conn.open = false; conn.emit('close'); }
         else if (m.op === 'data') {
           const d = m.d;
@@ -240,7 +240,7 @@ export class NetClient extends Emitter {
       peer.on('error', e => fail(new Error(e.type === 'peer-unavailable' ? `Room ${code} not found.` : `Network error (${e.type ?? e.message})`)));
       peer.on('open', () => {
         const conn = peer.connect(PREFIX + code, { reliable: true });
-        conn.on('open', () => conn.send({ t: 'hello', name: me.name, car: me.car, power: me.power }));
+        conn.on('open', () => conn.send({ t: 'hello', name: me.name, car: me.car, power: me.power, paint: me.paint }));
         conn.on('data', msg => {
           if (done) return;
           if (msg.t === 'welcome') {
@@ -280,6 +280,6 @@ export class NetClient extends Emitter {
   }
 
   send(msg) { if (this.conn.open) this.conn.send(msg); }
-  updateMe(me) { this.send({ t: 'me', car: me.car, power: me.power }); }
+  updateMe(me) { this.send({ t: 'me', car: me.car, power: me.power, paint: me.paint }); }
   close() { this.peer.destroy(); }
 }

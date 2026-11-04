@@ -45,11 +45,12 @@ export class MenuSession {
     this.current = null;
   }
 
-  showCar(id) {
-    if (this.current === id) return;
-    this.current = id;
+  showCar(id, color = carById(id).color) {
+    const key = id + ':' + color;
+    if (this.current === key) return;
+    this.current = key;
     this.turn.clear();
-    this.turn.add(buildCarMesh(carById(id).color).group);
+    this.turn.add(buildCarMesh(color).group);
   }
 
   update() {}

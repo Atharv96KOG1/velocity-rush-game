@@ -9,13 +9,17 @@ const DEFAULT = {
   power: 'turbo',           // equipped super power
   challenges: {},           // id -> { done, best }
   world: { coins: [], traps: {}, sprints: {} },
+  paint: {},                // carId -> custom colour
+  ach: {},                  // achievement id -> true
+  stats: { nearMiss: 0, powers: 0 },
+  daily: '',                // last completed daily challenge day
 };
 
 function load() {
   try {
     const data = JSON.parse(localStorage.getItem(KEY) || '{}');
     const s = structuredClone(DEFAULT);
-    return { ...s, ...data, world: { ...s.world, ...(data.world || {}) } };
+    return { ...s, ...data, world: { ...s.world, ...(data.world || {}) }, stats: { ...s.stats, ...(data.stats || {}) } };
   } catch {
     return structuredClone(DEFAULT);
   }

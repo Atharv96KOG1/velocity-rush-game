@@ -128,7 +128,8 @@ export function makeMountains(color, fogColor, radius = 1500, count = 34, seed =
 }
 
 export function makeLights(scene, th) {
-  scene.add(new THREE.HemisphereLight(th.skyBottom, th.ground, th.amb));
+  const hemi = new THREE.HemisphereLight(th.skyBottom, th.ground, th.amb);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight(th.sun, th.sunI);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -140,6 +141,7 @@ export function makeLights(scene, th) {
   const off = new THREE.Vector3(90, 160, 50);
   return {
     sun,
+    hemi,
     follow(p) {
       sun.position.copy(p).add(off);
       sun.target.position.copy(p);

@@ -10,6 +10,10 @@ import { HUD, Minimap } from './hud.js';
 import { EngineSound, beep } from './audio.js';
 import { Sparks, Rings, Trail } from './fx.js';
 import { PowerSystem, POWERS } from './powers.js';
+import { StyleTracker } from './style.js';
+import { weatherTheme, fogRange, Rain } from './weather.js';
+import { GhostRecorder, GhostPlayer, loadGhost } from './ghost.js';
+import { unlock, count } from './achieve.js';
 
 const TEAM_COLORS = { A: [0x3a86ff, 0x4cc9f0, 0x4361ee], B: [0xff006e, 0xf72585, 0xff5d8f] };
 const FFA_COLORS = [0xffbe0b, 0x8338ec, 0x06d6a0, 0xfb5607, 0xe5e5e5, 0x118ab2];
@@ -37,7 +41,9 @@ export class RaceSession {
     this.cfg = cfg;
     this.pausable = true;
     this.over = false;
-    const def = TRACKS[cfg.track], th = THEMES[def.theme];
+    const def = TRACKS[cfg.track];
+    const weather = this.weather = cfg.weather ?? 'clear';
+    const th = weatherTheme(THEMES[def.theme], weather);
     this.theme = th;
     this.solo = cfg.type === 'timeTrial' || cfg.type === 'drift';
     this.net = cfg.net ?? null;
@@ -46,17 +52,18 @@ export class RaceSession {
     this.teamMode = !this.solo && !!TEAM_SIZE[cfg.format];
 
     const scene = this.scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(th.fog, 150, th.night ? 700 : 1100);
+    scene.fog = new THREE.Fog(th.fog, ...fogRange(weather, th.night));
     scene.add(makeSky(th.skyTop, th.skyBottom, th.night));
     this.lights = makeLights(scene, th);
     this.bloomStrength = th.night ? 0.95 : 0.35;
     scene.add(groundMesh(th));
 
     const track = this.track = new Track(def.points, { width: def.width });
-    scene.add(track.buildMesh({ walls: true, wallGap: 3.5, night: th.night }));
+    scene.add(track.buildMesh({ walls: true, wallGap: 3.5, night: th.night, wet: weather === 'rain' }));
     scene.add(track.startGate());
     scene.add(buildCircuitScenery(track, th));
     this.smoke = new Smoke(scene);
+    if (weather === 'rain') this.rain = new Rain(scene, this.lights.hemi);
     this.fx = { sparks: new Sparks(scene), rings: new Rings(scene) };
     this.powers = cfg.powers ? new PowerSystem(scene, {
       fx: this.fx,
@@ -74,6 +81,15 @@ export class RaceSession {
     this.humans = [];
     this.setupCars();
 
+    if (weather === 'rain') for (const c of this.cars) c.gripMul = 0.82;
+
+    // Ghost of the best run in solo events.
+    if (this.solo && this.humans.length === 1 && !this.net) {
+      this.recorder = new GhostRecorder();
+      const best = loadGhost(cfg.track, cfg.laps, cfg.type);
+      if (best) this.ghost = new GhostPlayer(scene, best);
+    }
+
     this.views = this.humans.map((h, i) => ({
       camera: h.cam.camera,
       rect: this.humans.length === 1 ? [0, 0, 1, 1] : i === 0 ? [0, 0.5, 1, 0.5] : [0, 0, 1, 0.5],
@@ -90,6 +106,16 @@ export class RaceSession {
         ? 'P1: WASD · Space drift · L-Shift nitro · E power · R reset · C cam    |    P2: Arrows · / drift · R-Shift nitro · Enter power · Backspace reset · . cam'
         : 'W/↑ gas · S/↓ brake · A D steer · SPACE drift · SHIFT nitro · E power · R reset · C camera · ESC pause',
     });
+
+    this.style = new StyleTracker(this.hud, this.humans, {
+      overtakes: !this.solo,
+      onEvent: (h, label, st) => {
+        if (label === 'NEAR MISS') count('nearMiss', 'nearMiss25', 25);
+        if (st.mult >= 5) unlock('combo5');
+      },
+    });
+    if (this.ghost) this.hud.msg(`👻 GHOST: YOUR BEST ${fmtTime(this.ghost.data.time)}`, 4);
+    if (weather === 'rain') this.hud.msg('🌧️ WET TRACK · LESS GRIP', 3);
 
     this.state = 'countdown';
     this.clock = 3.6;
@@ -145,7 +171,7 @@ export class RaceSession {
       if (e.human >= 0) {
         const h = humanCfg[e.human];
         const spec = carById(h.car);
-        car = new Car(spec, { name: h.name, team: e.team, human: true, player: e.human });
+        car = new Car(spec, { name: h.name, team: e.team, human: true, player: e.human, color: h.color ?? spec.color });
       } else {
         const spec = CARS[Math.floor(Math.random() * CARS.length)];
         car = new Car(spec, { name: e.name, team: e.team, color: e.color });
@@ -350,7 +376,10 @@ export class RaceSession {
       car.input = c;
       if (this.powers && !counting && this.state !== 'done') {
         if (car.isHuman && !car.finished) {
-          if (c.power && !car.prevPower && this.powers.use(car)) this.net?.send({ t: 'pw', id: car.id });
+          if (c.power && !car.prevPower && this.powers.use(car)) {
+            this.net?.send({ t: 'pw', id: car.id });
+            count('powers', 'powers25', 25);
+          }
           car.prevPower = c.power;
         } else {
           const ahead = this.cars.filter(o => o !== car && (!car.team || o.team !== car.team) && !o.eliminated
@@ -368,6 +397,8 @@ export class RaceSession {
       for (const c of [a, b]) if (c.cam) c.cam.shake = Math.max(c.cam.shake, Math.min(1, v / 15));
     });
     this.rank();
+    this.style.update(dt, this.cars, this.state === 'race');
+    if (this.recorder && this.state === 'race' && !this.humans[0].finished) this.recorder.record(this.time, this.humans[0]);
     this.rubberBand();
     if (this.cfg.type === 'knockout' && this.authority) this.knockout();
     this.checkEnd(dt);
@@ -519,7 +550,12 @@ export class RaceSession {
   finish() {
     this.state = 'done';
     this.over = true;
-    this.game.ui.showResults(this.results(), this.cfg);
+    const res = this.results();
+    const p1 = this.humans[0];
+    if (this.recorder && p1.finished) {
+      res.ghostSaved = this.recorder.saveIfBest(this.cfg.track, this.cfg.laps, this.cfg.type, p1.finishTime, p1.color);
+    }
+    this.game.ui.showResults(res, this.cfg);
   }
 
   results() {
@@ -555,12 +591,24 @@ export class RaceSession {
         case 'survive': success = !p1.eliminated && p1.position === 1; goalText = 'Be the last car standing'; break;
       }
     }
+    // Achievements for this result.
+    const won = !this.solo && !p1.eliminated && p1.position === 1 && (cfg.type !== 'race' || p1.finished);
+    if (won) {
+      unlock('firstWin');
+      if (cfg.type === 'knockout') unlock('koWin');
+      if (this.net) unlock('onlineWin');
+      if (this.weather === 'rain') unlock('rainWin');
+    }
+    if (p1.driftScore >= 10000) unlock('drift10k');
+
+    const style = this.style.total(p1), styleCredits = Math.min(1500, Math.round(style / 40));
     let credits;
     if (g) credits = success ? cfg.reward : 0;
     else credits = this.solo ? 150 : (PAYOUT[best - 1] ?? 40) + (teamWon ? 250 : 0);
 
     let head;
     if (g) head = success ? 'OBJECTIVE COMPLETE' : 'OBJECTIVE FAILED';
+    else if (teams && cfg.format === '1v1' && !this.net && this.humans.length === 1) head = p1.position === 1 ? 'YOU WIN THE DUEL' : 'DUEL LOST';
     else if (teams) head = teams.A === teams.B ? 'DRAW' : (teams.A > teams.B ? 'BLUE TEAM WINS' : 'RED TEAM WINS');
     else if (this.net && !this.solo) head = this.order[0].isHuman ? 'YOU WIN!' : `${this.order[0].name.toUpperCase()} WINS · YOU P${best}`;
     else if (this.humans.length === 2 && !this.solo) head = `${this.humans.find(h => h.position === best).name} WINS THE DUEL`;
@@ -570,6 +618,7 @@ export class RaceSession {
       head, success: g ? success : (teams ? teams[mine] >= teams[other] : best === 1), goalText, rows, teams, credits,
       track: TRACKS[cfg.track].name, solo: this.solo, type: cfg.type,
       p1Time: p1.finished ? p1.finishTime : null, p1Drift: Math.round(p1.driftScore),
+      style, styleCredits, credits: credits + styleCredits,
     };
   }
 
@@ -581,6 +630,15 @@ export class RaceSession {
       car.syncMesh();
       this.smoke.fromCar(car);
     }
+    if (this.rain) {
+      this.rain.update(dt, this.humans[0].cam.camera.position);
+      for (const car of this.cars) {
+        if (car.eliminated || car.speed < 18 || Math.random() > 0.15) continue;
+        const fx = Math.sin(car.yaw), fz = Math.cos(car.yaw);
+        this.smoke.emit(car.pos.x - fx * 2.4, car.pos.y - 0.2, car.pos.z - fz * 2.4, 0.45);
+      }
+    }
+    this.ghost?.update(this.time);
     this.smoke.update(dt);
     this.fx.sparks.update(dt);
     this.fx.rings.update(dt);
@@ -602,6 +660,7 @@ export class RaceSession {
       prev.cam = c.cam; prev.reset = c.reset;
 
       h.cam.update(dt);
+      if (h.kmh >= 300) unlock('speed300');
       h.engine.update(Math.abs(h.fwdSpeed) / h.spec.maxSpeed, h.input?.throttle ?? 0, h.nitroOn);
       this.hud.set(i, this.hudFor(h));
     });

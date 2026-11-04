@@ -125,12 +125,12 @@ export class Track {
     return g;
   }
 
-  buildMesh({ kerbs = true, walls = false, wallGap = 3.5, night = false } = {}) {
+  buildMesh({ kerbs = true, walls = false, wallGap = 3.5, night = false, wet = false } = {}) {
     textures();
     const group = new THREE.Group();
     const W = this.width / 2, L = this.lift;
     const road = new THREE.Mesh(this.ribbon(-W, W, L, L, 24),
-      new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      new THREE.MeshStandardMaterial({ map: roadTex, roughness: wet ? 0.28 : 0.85, metalness: wet ? 0.35 : 0, color: wet ? 0x9aa0aa : 0xffffff, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
     road.receiveShadow = true;
     group.add(road);
 

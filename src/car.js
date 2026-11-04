@@ -106,6 +106,9 @@ export class Car {
     // Super power state (timers in seconds, driven by PowerSystem).
     this.power = null;
     this.turbo = 0; this.shield = 0; this.ghost = 0; this.stun = 0;
+
+    this.draft = false;   // in another car's slipstream (set by StyleTracker)
+    this.gripMul = 1;     // weather: wet roads lower grip
   }
 
   get speed() { return Math.hypot(this.vx, this.vz); }
@@ -136,11 +139,11 @@ export class Car {
 
     this.nitroOn = c.nitro && this.boost > 0.01 && c.throttle > 0 && fwd > 3;
     if (this.nitroOn) this.boost = Math.max(0, this.boost - dt * 0.3);
-    const maxV = s.maxSpeed * (0.4 + 0.6 * sf) + (this.nitroOn ? 16 : 0) + (this.turbo > 0 ? 25 : 0) - (this.stun > 0 ? s.maxSpeed * 0.5 : 0);
+    const maxV = s.maxSpeed * (0.4 + 0.6 * sf) + (this.nitroOn ? 16 : 0) + (this.turbo > 0 ? 25 : 0) + (this.draft ? 6 : 0) - (this.stun > 0 ? s.maxSpeed * 0.5 : 0);
 
     if (c.throttle > 0 && fwd < maxV) {
       const r = Math.max(0, fwd) / maxV;
-      fwd += c.throttle * (s.accel + (this.nitroOn ? 18 : 0) + (this.turbo > 0 ? 34 : 0)) * (1 - r * r) * dt;
+      fwd += c.throttle * (s.accel + (this.nitroOn ? 18 : 0) + (this.turbo > 0 ? 34 : 0) + (this.draft ? 7 : 0)) * (1 - r * r) * dt;
     }
     this.braking = c.brake > 0 && fwd > 1;
     if (c.brake > 0) {
@@ -152,7 +155,7 @@ export class Car {
     if (!c.throttle && !c.brake) fwd -= Math.sign(fwd) * Math.min(Math.abs(fwd), 2.5 * dt);
     if (c.hand) fwd -= Math.sign(fwd) * Math.min(Math.abs(fwd), 5 * dt);
 
-    const grip = s.grip * (c.hand ? 0.3 : 1) * (0.55 + 0.45 * sf);
+    const grip = s.grip * this.gripMul * (c.hand ? 0.3 : 1) * (0.55 + 0.45 * sf);
     lat *= Math.exp(-grip * dt);
     // Cap the slip angle so drifts stay controllable instead of spinning out.
     if (fwd > 5) {

@@ -2,7 +2,11 @@ import { CARS, TRACKS, STORY, CHALLENGES, DIFFICULTY, carById } from './data.js'
 import { save, persist } from './save.js';
 import { RaceSession, fmtTime, TEAM_SIZE, TEAM_COLORS, FFA_COLORS } from './session-race.js';
 import { NetHost, NetClient, MAX_PLAYERS } from './net.js';
-import { AI_NAMES } from './data.js';
+import { AI_NAMES, WEATHER, PAINTS, ACHIEVEMENTS, dailyChallenge } from './data.js';
+import { unlock } from './achieve.js';
+
+const paintOf = id => save.paint?.[id] ?? carById(id).color;
+const hex = c => '#' + c.toString(16).padStart(6, '0');
 import { WorldSession } from './session-world.js';
 import { initAudio, beep } from './audio.js';
 import { POWERS, powerById } from './powers.js';
@@ -52,7 +56,7 @@ export class UI {
 
   toMenu() {
     if (this.game.session !== this.game.menu) this.game.backToMenu();
-    this.game.menu.showCar(save.car);
+    this.game.menu.showCar(save.car, paintOf(save.car));
   }
 
   // ---------- Main ----------
@@ -72,6 +76,7 @@ export class UI {
         <button class="btn alt" data-go="showWorld">Open World Tour<small>Free roam, coins, speed traps, sprint races</small></button>
         <button class="btn" data-go="showGarage">Garage<small>Buy and choose your car</small></button>
         <button class="btn alt" data-go="showPowers">Super Powers<small>Equipped: ${powerById(save.power).icon} ${powerById(save.power).name} · ${save.powers.length}/${POWERS.length} unlocked</small></button>
+        <button class="btn" data-go="showAchievements">Achievements<small>${Object.keys(save.ach).length}/${ACHIEVEMENTS.length} unlocked</small></button>
         <button class="btn" data-go="showControls">Controls</button>
       </div></div>`);
   }
@@ -83,7 +88,7 @@ export class UI {
 
   showSetup(humans) {
     this.toMenu();
-    const st = this.setupState ??= { track: 'harbor', format: '1v1', laps: 3, diff: 'normal', coop: false, mode: 'race', p2car: save.owned[0], powers: 'on', p2power: save.powers[0] };
+    const st = this.setupState ??= { track: 'harbor', format: '1v1', laps: 3, diff: 'normal', coop: false, mode: 'race', p2car: save.owned[0], powers: 'on', p2power: save.powers[0], weather: 'clear' };
     if (!save.owned.includes(st.p2car)) st.p2car = save.owned[0];
     if (!save.powers.includes(st.p2power)) st.p2power = save.powers[0];
     if (humans === 1 || st.format === '1v1') st.coop = false;
@@ -107,6 +112,8 @@ export class UI {
         </div>
         <div class="label">P2 Car</div>
         <div class="chips">${save.owned.map(id => `<button class="chip ${st.p2car === id ? 'on' : ''}" data-k="p2car" data-v="${id}"><span class="swatch" style="background:#${carById(id).color.toString(16).padStart(6, '0')}"></span>${carById(id).name}</button>`).join('')}</div>` : ''}
+      <div class="label">Weather</div>
+      <div class="chips">${chips('weather', Object.keys(WEATHER), v => `${WEATHER[v].icon} ${WEATHER[v].label}`)}</div>
       <div class="label">Super Powers</div>
       <div class="chips">${chips('powers', ['on', 'off'], v => v === 'on' ? `ON · ${powerById(save.power).icon} ${powerById(save.power).name}` : 'OFF')}</div>
       ${humans === 2 && st.powers === 'on' ? `<div class="label">P2 Power</div><div class="chips">${save.powers.map(id => `<button class="chip ${st.p2power === id ? 'on' : ''}" data-k="p2power" data-v="${id}">${powerById(id).icon} ${powerById(id).name}</button>`).join('')}</div>` : ''}
@@ -128,13 +135,13 @@ export class UI {
     node.querySelectorAll('[data-coop]').forEach(b => b.onclick = () => { st.coop = b.dataset.coop === '1'; this.showSetup(humans); });
     node.querySelector('[data-start]').onclick = () => {
       const players = humans === 2
-        ? [{ car: save.car, name: 'P1', power: save.power }, { car: st.p2car, name: 'P2', power: st.p2power }]
-        : [{ car: save.car, name: 'YOU', power: save.power }];
+        ? [{ car: save.car, name: 'P1', power: save.power, color: paintOf(save.car) }, { car: st.p2car, name: 'P2', power: st.p2power, color: paintOf(st.p2car) }]
+        : [{ car: save.car, name: 'YOU', power: save.power, color: paintOf(save.car) }];
       this.startRace({
         title: humans === 2 ? 'Local Multiplayer' : 'Quick Race',
         type: st.mode, track: st.track, format: st.format,
         laps: st.mode === 'knockout' ? 6 : st.laps,
-        difficulty: DIFFICULTY[st.diff], humans: players, coop: st.coop, powers: st.powers === 'on',
+        difficulty: DIFFICULTY[st.diff], humans: players, coop: st.coop, powers: st.powers === 'on', weather: st.weather,
       });
     };
   }
@@ -147,7 +154,7 @@ export class UI {
 
   // ---------- Online ----------
 
-  me() { return { name: save.name ?? 'Racer', car: save.car, power: save.power }; }
+  me() { return { name: save.name ?? 'Racer', car: save.car, power: save.power, paint: paintOf(save.car), color: paintOf(save.car) }; }
 
   showOnline(error = '') {
     this.toMenu();
@@ -193,7 +200,7 @@ export class UI {
   attachNet(net) {
     this.net = net;
     if (net.role === 'host') {
-      net.setSettings(this.netSettings ??= { track: 'harbor', mode: 'race', format: 'ffa', laps: 3, diff: 'normal', powers: true, fill: true });
+      net.setSettings(this.netSettings ??= { track: 'harbor', mode: 'race', format: 'ffa', laps: 3, diff: 'normal', powers: true, fill: true, weather: 'clear' });
     }
     this.netOff = [
       net.on('lobby', () => { if (this.inLobby) this.showLobby(); }),
@@ -234,7 +241,7 @@ export class UI {
       <div class="desc">${host ? 'Share this code with friends. Start when everyone is in.' : 'Waiting for the host to start the race…'}</div>
       <div class="label">Players ${players.length}/${MAX_PLAYERS}</div>
       <div class="players">${players.map(p => `<div class="player ${p.id === net.localId ? 'me' : ''}">
-        <span class="swatch" style="background:#${carById(p.car).color.toString(16).padStart(6, '0')}"></span>
+        <span class="swatch" style="background:${hex(p.paint ?? carById(p.car).color)}"></span>
         <b>${esc(p.name)}</b>${p.host ? ' <span class="tag">HOST</span>' : ''}${p.id === net.localId ? ' <span class="tag good">YOU</span>' : ''}
         <span class="pmeta">${carById(p.car).name} · ${powerById(p.power).icon}</span></div>`).join('')}</div>
       <div class="label">Track</div>
@@ -246,6 +253,8 @@ export class UI {
       ${st.mode === 'race' ? `<div class="label">Laps</div><div class="chips">${chips('laps', [1, 2, 3, 5])}</div>` : ''}
       <div class="label">AI</div>
       <div class="chips">${chips('fill', [true, false], v => v ? 'Fill empty slots with AI' : 'Players only', v => !v && TEAM_SIZE[st.format])}${chips('diff', ['easy', 'normal', 'hard'], v => v.toUpperCase())}</div>
+      <div class="label">Weather</div>
+      <div class="chips">${chips('weather', Object.keys(WEATHER), v => `${WEATHER[v].icon} ${WEATHER[v].label}`)}</div>
       <div class="label">Super Powers</div>
       <div class="chips">${chips('powers', [true, false], v => v ? 'ON' : 'OFF')}</div>
       <div class="desc" style="margin-top:14px">${slots.total} cars on the grid${slots.ai ? ` (${slots.ai} AI)` : ''}.</div>
@@ -284,7 +293,7 @@ export class UI {
     const names = [...AI_NAMES].sort(() => Math.random() - 0.5);
     const rnd = a => a[Math.floor(Math.random() * a.length)];
     const ai = (team, color) => ({ id: 'ai' + names.length, kind: 'ai', name: names.pop(), car: rnd(CARS).id, color, team, power: rnd(POWERS).id });
-    const human = (p, team) => ({ id: p.id, kind: 'player', name: p.name, car: p.car, team, power: p.power });
+    const human = (p, team) => ({ id: p.id, kind: 'player', name: p.name, car: p.car, color: p.paint, team, power: p.power });
     const n = TEAM_SIZE[st.format];
     if (n) {
       const A = [], B = [];
@@ -307,7 +316,7 @@ export class UI {
     this.lastOnline = msg;
     this.startRace({
       title: 'Online Race', type: st.mode, track: st.track, format: st.format,
-      laps: st.mode === 'knockout' ? 6 : st.laps, difficulty: DIFFICULTY[st.diff], powers: st.powers,
+      laps: st.mode === 'knockout' ? 6 : st.laps, difficulty: DIFFICULTY[st.diff], powers: st.powers, weather: st.weather ?? 'clear',
       humans: [this.me()], entries: msg.entries, net: this.net,
     });
   }
@@ -345,7 +354,8 @@ export class UI {
   eventCfg(s, extra) {
     return {
       type: s.type, track: s.track, format: s.format ?? 'ffa', laps: s.laps, difficulty: s.difficulty ?? 1,
-      goal: s.goal, reward: s.reward, rival: s.rival, humans: [{ car: save.car, name: 'YOU', power: save.power }],
+      goal: s.goal, reward: s.reward, rival: s.rival, weather: s.weather ?? 'clear',
+      humans: [{ car: save.car, name: 'YOU', power: save.power, color: paintOf(save.car) }],
       powers: s.type === 'race' || s.type === 'knockout', ...extra,
     };
   }
@@ -357,7 +367,13 @@ export class UI {
     const node = this.mount(`<div class="screen full">${this.credits()}
       <div class="h2">CHALLENGES</div>
       <div class="desc">One-off tests of skill. Rewards pay out on first completion; replay anytime to improve your best.</div>
-      <div class="cards">${CHALLENGES.map(c => {
+      <div class="cards">${(() => {
+        const d = dailyChallenge(), done = save.daily === d.day;
+        return `<button class="card daily ${done ? 'done' : ''}" data-daily>
+          <span class="tag ${done ? 'good' : ''}">${done ? 'DAILY · DONE ✓' : 'DAILY CHALLENGE'}</span><span class="tag">${WEATHER[d.weather].icon} ${WEATHER[d.weather].label}</span>
+          <h3 style="margin-top:8px">${TYPE_LABEL[d.type]} · ${TRACKS[d.track].name}</h3><p>${d.desc} A new challenge every day.</p>
+          <div class="meta">${done ? 'Come back tomorrow' : `◆ ${d.reward.toLocaleString()} CR`}</div></button>`;
+      })()}${CHALLENGES.map(c => {
         const rec = save.challenges[c.id];
         return `<button class="card ${rec?.done ? 'done' : ''}" data-id="${c.id}">
           <span class="tag ${rec?.done ? 'good' : ''}">${rec?.done ? 'COMPLETE ✓' : TYPE_LABEL[c.type].toUpperCase()}</span>
@@ -365,6 +381,10 @@ export class UI {
           <div class="meta">${rec?.best ? 'Best: ' + rec.best + ' · ' : ''}◆ ${c.reward.toLocaleString()} CR</div></button>`;
       }).join('')}</div>
       <div class="row"><button class="btn inline" data-go="showMain">Back</button></div></div>`);
+    node.querySelector('[data-daily]').onclick = () => {
+      const d = dailyChallenge();
+      this.startRace(this.eventCfg({ ...d, reward: save.daily === d.day ? 0 : d.reward }, { dailyDay: d.day, title: d.title }));
+    };
     node.querySelectorAll('[data-id]').forEach(b => b.onclick = () => {
       const c = CHALLENGES.find(x => x.id === b.dataset.id);
       this.startRace(this.eventCfg(c, { challengeId: c.id, title: c.title }));
@@ -391,8 +411,8 @@ export class UI {
       const p2car = this.setupState?.p2car && save.owned.includes(this.setupState.p2car) ? this.setupState.p2car : save.owned[0];
       const p2power = this.setupState?.p2power && save.powers.includes(this.setupState.p2power) ? this.setupState.p2power : save.powers[0];
       const humans = n === 2
-        ? [{ car: save.car, name: 'P1', power: save.power }, { car: p2car, name: 'P2', power: p2power }]
-        : [{ car: save.car, name: 'YOU', power: save.power }];
+        ? [{ car: save.car, name: 'P1', power: save.power, color: paintOf(save.car) }, { car: p2car, name: 'P2', power: p2power, color: paintOf(p2car) }]
+        : [{ car: save.car, name: 'YOU', power: save.power, color: paintOf(save.car) }];
       this.root.innerHTML = '';
       this.game.setSession(new WorldSession(this.game, { humans, world: true }));
     });
@@ -402,7 +422,7 @@ export class UI {
 
   showGarage(previewId = save.car) {
     this.toMenu();
-    this.game.menu.showCar(previewId);
+    this.game.menu.showCar(previewId, paintOf(previewId));
     const max = { maxSpeed: 75, accel: 30, handling: 3.1, grip: 8 };
     const node = this.mount(`<div class="screen">${this.credits()}
       <div class="h2">GARAGE</div>
@@ -411,14 +431,22 @@ export class UI {
         const owned = save.owned.includes(c.id), sel = save.car === c.id;
         const stat = (label, k) => `<div class="stat">${label}<div class="bar"><i style="width:${Math.round((c[k] / max[k]) * 100)}%"></i></div></div>`;
         return `<div class="card ${previewId === c.id ? 'sel' : ''}" data-car="${c.id}">
-          <h3><span class="swatch" style="background:#${c.color.toString(16).padStart(6, '0')}"></span>${c.name}</h3><p>${c.desc}</p>
+          <h3><span class="swatch" style="background:${hex(paintOf(c.id))}"></span>${c.name}</h3><p>${c.desc}</p>
           ${stat('Top speed', 'maxSpeed')}${stat('Accel', 'accel')}${stat('Handling', 'handling')}${stat('Grip', 'grip')}
           <div class="row" style="margin-top:12px">${sel ? '<span class="tag good">SELECTED</span>'
             : owned ? `<button class="chip" data-select="${c.id}">Select</button>`
-            : `<button class="chip" data-buy="${c.id}" ${save.credits < c.price ? 'disabled' : ''}>Buy ◆ ${c.price.toLocaleString()}</button>`}</div></div>`;
+            : `<button class="chip" data-buy="${c.id}" ${save.credits < c.price ? 'disabled' : ''}>Buy ◆ ${c.price.toLocaleString()}</button>`}</div>
+          ${owned ? `<div class="label" style="margin:12px 0 0">Paint</div><div class="paints">${[c.color, ...PAINTS.filter(p => p !== c.color)].map(p =>
+            `<button class="paint ${paintOf(c.id) === p ? 'on' : ''}" style="background:${hex(p)}" data-paint="${c.id}:${p}" title="${hex(p)}"></button>`).join('')}</div>` : ''}</div>`;
       }).join('')}</div>
       <div class="row"><button class="btn inline" data-go="showMain">Back</button></div></div>`);
     node.querySelectorAll('[data-car]').forEach(c => c.onclick = e => { if (!e.target.closest('button')) this.showGarage(c.dataset.car); });
+    node.querySelectorAll('[data-paint]').forEach(b => b.onclick = () => {
+      const [id, col] = b.dataset.paint.split(':');
+      save.paint[id] = Number(col);
+      persist();
+      this.showGarage(id);
+    });
     node.querySelectorAll('[data-select]').forEach(b => b.onclick = () => { save.car = b.dataset.select; persist(); this.showGarage(save.car); });
     node.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
       const c = carById(b.dataset.buy);
@@ -463,6 +491,20 @@ export class UI {
     });
   }
 
+  // ---------- Achievements ----------
+
+  showAchievements() {
+    this.toMenu();
+    this.mount(`<div class="screen full">${this.credits()}
+      <div class="h2">ACHIEVEMENTS</div>
+      <div class="desc">${Object.keys(save.ach).length} of ${ACHIEVEMENTS.length} unlocked. Each one pays credits the moment you earn it.</div>
+      <div class="cards">${ACHIEVEMENTS.map(a => `<div class="card ach ${save.ach[a.id] ? 'done' : 'lockedach'}" style="cursor:default">
+        <div class="icon">${a.icon}</div><div><h3>${a.name}</h3><p>${a.desc}</p>
+        <div class="meta">${save.ach[a.id] ? 'UNLOCKED ✓' : `◆ ${a.reward.toLocaleString()} CR`}</div></div></div>`).join('')}</div>
+      <div class="desc" style="margin-top:16px">Near misses: ${save.stats.nearMiss ?? 0} · Powers used: ${save.stats.powers ?? 0}</div>
+      <div class="row"><button class="btn inline" data-go="showMain">Back</button></div></div>`);
+  }
+
   // ---------- Controls ----------
 
   showControls() {
@@ -481,7 +523,8 @@ export class UI {
         <tr><td>Super power</td><td><kbd>E</kbd></td><td><kbd>Enter</kbd></td><td>LB</td></tr>
         <tr><td>Pause</td><td colspan="3"><kbd>Esc</kbd></td></tr>
       </table>
-      <div class="desc" style="margin-top:20px">Drifting fills the nitro bar. Driving flat out on tarmac trickles it too. Off-road slows you down.</div>
+      <div class="desc" style="margin-top:20px">Drifting fills the nitro bar. Driving flat out on tarmac trickles it too. Off-road slows you down.<br>
+        Style points: tuck in behind a car to slipstream, pass close to cars for near misses, overtake and chain drifts. Landing tricks within 3 seconds builds a combo up to x5.</div>
       <div class="row"><button class="btn inline" data-go="showMain">Back</button></div></div>`);
   }
 
@@ -512,6 +555,8 @@ export class UI {
     // Rewards and progression.
     let unlocked = '';
     save.credits += res.credits;
+    if (res.success && cfg.storyIndex === STORY.length - 1) unlock('story');
+    if (res.success && cfg.dailyDay && save.daily !== cfg.dailyDay) { save.daily = cfg.dailyDay; unlock('daily'); }
     if (res.success && cfg.storyIndex != null && cfg.storyIndex === save.story) {
       save.story++;
       unlocked = save.story < STORY.length ? `Chapter ${save.story + 1} unlocked!` : 'Story complete. You own Velocity.';
@@ -538,6 +583,7 @@ export class UI {
       ${res.goalText ? `<div class="goal">🎯 ${res.goalText}</div>` : ''}
       ${showTeams ? `<div class="teamscore"><div style="background:var(--teamA)">BLUE ${res.teams.A}</div><div style="background:var(--teamB)">${res.teams.B} RED</div></div>` : ''}
       <table class="results"><tr><th>#</th><th>Driver</th><th>Time</th><th>Best lap</th>${res.type === 'drift' ? '<th>Drift</th>' : ''}</tr>${rows}</table>
+      ${res.style ? `<div class="goal">🔥 Style ${res.style.toLocaleString()} pts → +${res.styleCredits.toLocaleString()} CR${res.ghostSaved ? '<br>👻 New best run saved as your ghost' : ''}</div>` : res.ghostSaved ? '<div class="goal">👻 New best run saved as your ghost</div>' : ''}
       <div class="goal">◆ +${res.credits.toLocaleString()} CR earned · Balance ${save.credits.toLocaleString()} CR${unlocked ? `<br>⭐ ${unlocked}` : ''}</div>
       <div class="row">
         ${next ? '<button class="btn primary inline" data-a="next">Next Chapter</button>' : ''}

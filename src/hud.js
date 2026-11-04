@@ -21,12 +21,12 @@ export class HUD {
         <div class="speedlines"></div><div class="vignette"></div>
         <div class="hud-power"><div class="pw-icon"></div><div class="pw-body"><div class="pw-name"></div><div class="pw-bar"><i></i></div></div></div>
         <div class="hud-pos"></div><div class="hud-info"></div><div class="hud-drift"></div>
-        <div class="hud-msg"></div><div class="hud-center"></div>
+        <div class="hud-msg"></div><div class="hud-center"></div><div class="hud-feed"></div><div class="hud-combo"></div>
         <div class="hud-speed"><b>0</b><span>KM/H</span><div class="boost"><i></i></div></div>`;
       this.el.appendChild(v);
       const q = s => v.querySelector(s);
       this.views.push({ pos: q('.hud-pos'), info: q('.hud-info'), drift: q('.hud-drift'), msg: q('.hud-msg'), center: q('.hud-center'), speed: q('.hud-speed b'), boost: q('.boost'), boostFill: q('.boost i'),
-        lines: q('.speedlines'), vignette: q('.vignette'), power: q('.hud-power'), pwIcon: q('.pw-icon'), pwName: q('.pw-name'), pwFill: q('.pw-bar i') });
+        feed: q('.hud-feed'), combo: q('.hud-combo'), lines: q('.speedlines'), vignette: q('.vignette'), power: q('.hud-power'), pwIcon: q('.pw-icon'), pwName: q('.pw-name'), pwFill: q('.pw-bar i') });
       this.timers.push({ msg: 0, center: 0 });
     }
     if (team) {
@@ -95,6 +95,24 @@ export class HUD {
 
   each(idx, fn) {
     this.views.forEach((v, i) => { if (idx === null || idx === i) fn(v, this.timers[i]); });
+  }
+
+  /** Style event pop-up, stacked on the right and fading out. */
+  popup(i, text, color = '#ffd166') {
+    const v = this.views[i];
+    if (!v) return;
+    const el = document.createElement('div');
+    el.className = 'pop';
+    el.style.color = color;
+    el.textContent = text;
+    v.feed.prepend(el);
+    while (v.feed.children.length > 4) v.feed.lastChild.remove();
+    setTimeout(() => el.remove(), 1800);
+  }
+
+  setCombo(i, mult, pts) {
+    const v = this.views[i];
+    this.put(v.combo, i + 'cb', mult > 1 ? `x${mult} · ${pts}` : '');
   }
 
   tick(dt) {

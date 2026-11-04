@@ -12,6 +12,8 @@ import { save, persist } from './save.js';
 import { fmtTime, fxHud } from './session-race.js';
 import { Sparks, Rings, Trail } from './fx.js';
 import { PowerSystem } from './powers.js';
+import { StyleTracker } from './style.js';
+import { unlock, count } from './achieve.js';
 
 const HALF = 1000;           // world spans -1000..1000 on x and z
 const WATER = -9;
@@ -98,7 +100,7 @@ export class WorldSession {
     // Players start on Central Ave just south of downtown, heading north.
     const ns = this.roadById.ns, si = Math.round(ns.N * 0.36);
     this.humans = cfg.humans.map((h, i) => {
-      const car = new Car(carById(h.car), { name: h.name, human: true, player: i });
+      const car = new Car(carById(h.car), { name: h.name, human: true, player: i, color: h.color ?? carById(h.car).color });
       const side = (i - (cfg.humans.length - 1) / 2) * 5;
       const x = ns.px[si] - ns.tz[si] * side, z = ns.pz[si] + ns.tx[si] * side;
       car.place(x, z, Math.atan2(ns.tx[si], ns.tz[si]), roadHeight(x, z) + ROAD_LIFT);
@@ -146,6 +148,13 @@ export class WorldSession {
       hint: 'Explore! Gold rings = coins · Red gates = speed traps · Green beacons = sprint races · E super power · ESC pause',
     });
     this.hud.msg('OPEN WORLD TOUR', 3);
+    this.style = new StyleTracker(this.hud, this.humans, {
+      overtakes: false,
+      onEvent: (h, label, st) => {
+        if (label === 'NEAR MISS') count('nearMiss', 'nearMiss25', 25);
+        if (st.mult >= 5) unlock('combo5');
+      },
+    });
   }
 
   // ---------- World building ----------
@@ -367,7 +376,7 @@ export class WorldSession {
       }
       car.input = c;
       if (car.isHuman) {
-        if (c.power && !car.prevBtn.power) this.powers.use(car);
+        if (c.power && !car.prevBtn.power && this.powers.use(car)) count('powers', 'powers25', 25);
         car.prevBtn.power = c.power;
       }
       car.update(dt, c);
@@ -382,6 +391,7 @@ export class WorldSession {
       this.fx.sparks.emit(x, y, z, Math.min(40, v * 3), 0xffc46b, 7, 3);
       for (const c of [a, b]) if (c.cam) c.cam.shake = Math.max(c.cam.shake, Math.min(1, v / 15));
     });
+    this.style.update(dt, this.allCars);
     for (const h of this.humans) this.events(h, dt);
   }
 
@@ -490,6 +500,7 @@ export class WorldSession {
         persist();
         beep(1320, 0.12, 'triangle');
         this.hud.msg(`+50 CR · COIN ${save.world.coins.length}/${this.coins.length}`, 1.8, h.player, '#ffd166');
+        if (save.world.coins.length >= this.coins.length) unlock('coins45');
       }
     }
 
@@ -569,6 +580,7 @@ export class WorldSession {
       if (c.reset && !h.prevBtn.reset) this.resetHuman(h);
       h.prevBtn.cam = c.cam; h.prevBtn.reset = c.reset;
       h.cam.update(dt);
+      if (h.kmh >= 300) unlock('speed300');
       h.engine.update(Math.abs(h.fwdSpeed) / h.spec.maxSpeed, h.input?.throttle ?? 0, h.nitroOn);
 
       if (h.sprint) {

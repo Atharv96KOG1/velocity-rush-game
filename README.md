@@ -3,7 +3,7 @@
 # 🏁 Velocity Rush
 
 **A fast 3D arcade racer that runs in your browser.**
-Story campaign · team races · online multiplayer · open world · super powers
+Story campaign · team races · online multiplayer · open world · super powers · dynamic weather
 
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES2022-f7df1e?logo=javascript&logoColor=black)
 ![Three.js](https://img.shields.io/badge/Three.js-r169-000000?logo=threedotjs&logoColor=white)
@@ -24,6 +24,7 @@ Story campaign · team races · online multiplayer · open world · super powers
 - [Quick start](#quick-start)
 - [Game modes](#game-modes)
 - [Super powers](#super-powers)
+- [Style, weather and ghosts](#style-weather-and-ghosts)
 - [Controls](#controls)
 - [Online multiplayer](#online-multiplayer)
 - [Architecture](#architecture)
@@ -36,6 +37,10 @@ Story campaign · team races · online multiplayer · open world · super powers
 - **Eight modes.** Story campaign, quick race, knockout, challenges, open world, split-screen and online play.
 - **1v1, 2v2, 3v3 and 6-car free-for-all**, with team scoring and AI teammates or rivals.
 - **Six unlockable super powers**, used by AI rivals too.
+- **Style system.** Near misses, slipstreaming, overtakes and drift chains build a combo of up to x5 that refills nitro and pays credits.
+- **Dynamic weather.** Clear, sunset, fog or rain. Rain brings a wet, reflective track, lower grip, spray and lightning.
+- **Ghost racer.** Time trials save your best run, and next time you race against its replay.
+- **Paint shop, achievements and daily challenges.** Ten paint colors per car, 12 achievements with rewards, and a new event every day.
 - **Online multiplayer for up to 6 players** with room codes, over the internet (WebRTC) or a built-in LAN relay.
 - **A 2 km × 2 km open world** with downtown, a coastal highway, ridge roads, lakes, traffic and collectibles.
 - **Polished visuals.** Bloom, light trails, sparks, shockwaves, shield bubbles, speed lines, camera shake, a dynamic sky and clouds.
@@ -51,6 +56,9 @@ Story campaign · team races · online multiplayer · open world · super powers
   <tr>
     <td width="50%"><img src="docs/screenshots/open-world.jpg" alt="Open world coastal highway"><br><sub><b>Open World Tour</b>: coastal highway, lake and sprint beacon</sub></td>
     <td width="50%"><img src="docs/screenshots/split-screen.jpg" alt="Two-player split-screen"><br><sub><b>Split-screen</b>: two players on one keyboard or two gamepads</sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/screenshots/rain-night.jpg" alt="Neon City in the rain"><br><sub><b>Rain at night</b>: wet asphalt, light trails and lightning in Neon City</sub></td>
   </tr>
 </table>
 
@@ -82,7 +90,9 @@ Open **http://localhost:8000**.
 | **Online Multiplayer** | Up to 6 players with room codes, plus optional AI fill. |
 | **Challenges** | Time trials, drift scoring, knockout and hard-AI races, with saved personal bests. |
 | **Open World Tour** | Free roam with 45 coins, 6 speed traps, 4 checkpoint sprints and highway traffic. Solo or 2-player. |
-| **Garage** | Four cars with distinct top speed, acceleration, handling and grip, bought with credits. |
+| **Garage** | Four cars with distinct top speed, acceleration, handling and grip, bought with credits. Each one can be repainted. |
+| **Daily Challenge** | A new race, time trial, drift or knockout every day, generated from the date, with a 1,500 CR reward. |
+| **Achievements** | 12 goals, from breaking 300 km/h to collecting every coin, each paying credits. |
 
 **Tracks:** Harbor Loop (day, fast sweepers), Red Canyon (desert, tight hairpins) and Neon City (night, street circuit).
 
@@ -100,6 +110,28 @@ Unlock powers with credits on the **Super Powers** screen and equip one. The met
 | 👻 | **Phantom Phase** | 4 s passing through cars with full grip off-road | 16 s |
 | 🌀 | **EMP Pulse** | Stalls every rival within 110 m for 2.5 s | 20 s |
 | ✦ | **Blink** | Teleports 45 m ahead along the road | 22 s |
+
+## Style, weather and ghosts
+
+**Style points.** Every trick tops up nitro, and your style total turns into bonus credits at the end of the race. Land the next trick within 3 seconds to raise the combo, up to x5.
+
+| Trick | How |
+|---|---|
+| Slipstream | Tuck in 4–22 m behind a car at speed. While drafting you also get extra top speed. |
+| Near miss | Pass alongside another car or traffic at speed without touching it |
+| Overtake | Reach a new best position in the race |
+| Drift | Hold a long drift; the bigger it is, the bigger the payout |
+
+**Weather.** Pick it in Quick Race, the online lobby or the daily challenge. Some story chapters have fixed weather.
+
+| | Weather | Effect |
+|---|---|---|
+| ☀️ | Clear | Standard conditions |
+| 🌇 | Sunset | Low warm sun and purple sky |
+| 🌫️ | Fog | Visibility drops to about 200 m |
+| 🌧️ | Rain | Wet reflective asphalt, 18% less grip, tyre spray, lightning and thunder |
+
+**Ghost racer.** In time trials and drift events your best run is recorded and saved. Next time, a see-through cyan car replays it, so you're always racing your personal best.
 
 ## Controls
 
@@ -154,6 +186,10 @@ velocity-rush/
     ├── track.js          Spline roads: sampling, nearest-point queries, road / kerb / wall meshes
     ├── ai.js             Look-ahead steering with bend-aware braking
     ├── powers.js         Super power definitions, charging, activation, AI usage
+    ├── style.js          Style points: slipstream, near misses, overtakes, drift combos
+    ├── weather.js        Weather themes, fog ranges, rain particles and lightning
+    ├── ghost.js          Ghost run recording and playback
+    ├── achieve.js        Achievement unlocks and toast notifications
     ├── fx.js             Sparks, shockwave rings, shield shader, light trails
     ├── session-race.js   Circuit races: grid, laps, ranking, teams, knockout, goals, network sync
     ├── session-world.js  Open world: terrain, road network, collisions, events, traffic
@@ -178,10 +214,9 @@ velocity-rush/
 ## Roadmap
 
 - [ ] Online sessions in the open world
-- [ ] Car upgrades and a paint shop
+- [ ] Car performance upgrades
 - [ ] More tracks and an in-game track editor
 - [ ] glTF car models and recorded engine audio
-- [ ] Ghost replays for time trials
 - [ ] Touch controls for tablets
 
 ---
