@@ -7,6 +7,8 @@ import { unlock } from './achieve.js';
 
 const paintOf = id => save.paint?.[id] ?? carById(id).color;
 const tuneOf = id => save.upgrades?.[id] ?? null;
+// The LAN relay only exists when the game is served by serve.py on this machine or network.
+const LOCAL_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\])/.test(location.hostname);
 const hex = c => '#' + c.toString(16).padStart(6, '0');
 import { WorldSession } from './session-world.js';
 import { initAudio, beep } from './audio.js';
@@ -173,7 +175,7 @@ export class UI {
       <div class="desc" style="margin-top:8px">Car: ${carById(save.car).name} · Power: ${powerById(save.power).icon} ${powerById(save.power).name} <span style="opacity:.7">(change in Garage / Super Powers)</span></div>
       <div class="menu">
         <button class="btn primary" data-host="p2p">Host Online Room<small>Internet, peer-to-peer · you pick the track and rules</small></button>
-        <button class="btn" data-host="lan">Host on Local Network<small>Via this computer's serve.py · friends open ${esc(location.host)}</small></button>
+        ${LOCAL_HOST ? `<button class="btn" data-host="lan">Host on Local Network<small>Via this computer's serve.py · friends open ${esc(location.host)}</small></button>` : ''}
       </div>
       <div class="label">Join with a code</div>
       <div class="row" style="margin-top:0">

@@ -188,10 +188,12 @@ export class NetClient extends Emitter {
   /** Try the local relay first (if this page came from serve.py), then peer-to-peer. */
   static async join(code, me) {
     code = code.trim().toUpperCase();
-    try {
-      return await NetClient.joinRelay(code, me);
-    } catch (e) {
-      if (e.fatal) throw e;
+    if (location.protocol === 'http:') {
+      try {
+        return await NetClient.joinRelay(code, me);
+      } catch (e) {
+        if (e.fatal) throw e;
+      }
     }
     return NetClient.joinP2P(code, me);
   }
