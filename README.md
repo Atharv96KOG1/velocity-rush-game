@@ -1,0 +1,191 @@
+<div align="center">
+
+# 🏁 Velocity Rush
+
+**A fast 3D arcade racer that runs in your browser.**
+Story campaign · team races · online multiplayer · open world · super powers
+
+![JavaScript](https://img.shields.io/badge/JavaScript-ES2022-f7df1e?logo=javascript&logoColor=black)
+![Three.js](https://img.shields.io/badge/Three.js-r169-000000?logo=threedotjs&logoColor=white)
+![WebRTC](https://img.shields.io/badge/Multiplayer-WebRTC%20%2B%20WebSocket-08d9d6)
+![No build step](https://img.shields.io/badge/build-none-3ddc84)
+![Platform](https://img.shields.io/badge/platform-desktop%20browser-ff2e63)
+
+<img src="docs/screenshots/harbor-loop.jpg" alt="Racing through Harbor Loop" width="100%">
+
+</div>
+
+---
+
+## Contents
+
+- [Highlights](#highlights)
+- [Screenshots](#screenshots)
+- [Quick start](#quick-start)
+- [Game modes](#game-modes)
+- [Super powers](#super-powers)
+- [Controls](#controls)
+- [Online multiplayer](#online-multiplayer)
+- [Architecture](#architecture)
+- [Roadmap](#roadmap)
+
+## Highlights
+
+- **Runs anywhere, installs nothing.** Plain ES modules and Three.js from a CDN. No bundler, no `npm install`.
+- **Tuned arcade handling.** 120 Hz fixed-step physics with grip, slip-angle limited drifting, nitro and slope gravity.
+- **Eight modes.** Story campaign, quick race, knockout, challenges, open world, split-screen and online play.
+- **1v1, 2v2, 3v3 and 6-car free-for-all**, with team scoring and AI teammates or rivals.
+- **Six unlockable super powers**, used by AI rivals too.
+- **Online multiplayer for up to 6 players** with room codes, over the internet (WebRTC) or a built-in LAN relay.
+- **A 2 km × 2 km open world** with downtown, a coastal highway, ridge roads, lakes, traffic and collectibles.
+- **Polished visuals.** Bloom, light trails, sparks, shockwaves, shield bubbles, speed lines, camera shake, a dynamic sky and clouds.
+- **Procedural audio.** Engine and UI sounds are synthesized with WebAudio, so the game ships with no audio files.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/neon-city.jpg" alt="Neon City night circuit"><br><sub><b>Neon City</b>: midnight street circuit with Overdrive active</sub></td>
+    <td width="50%"><img src="docs/screenshots/red-canyon.jpg" alt="Red Canyon desert circuit"><br><sub><b>Red Canyon</b>: a Shockwave scatters the pack</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/open-world.jpg" alt="Open world coastal highway"><br><sub><b>Open World Tour</b>: coastal highway, lake and sprint beacon</sub></td>
+    <td width="50%"><img src="docs/screenshots/split-screen.jpg" alt="Two-player split-screen"><br><sub><b>Split-screen</b>: two players on one keyboard or two gamepads</sub></td>
+  </tr>
+</table>
+
+## Quick start
+
+Requires Python 3 and a modern desktop browser (Chrome, Edge, Firefox or Safari).
+
+```bash
+git clone https://github.com/Atharv96KOG1/velocity-rush-game.git
+cd velocity-rush-game
+python3 serve.py
+```
+
+Open **http://localhost:8000**.
+
+`serve.py` serves the game with caching disabled and hosts the LAN multiplayer relay. Three.js, PeerJS and the fonts load from CDNs, so you need an internet connection the first time.
+
+> [!NOTE]
+> Opening `index.html` directly from disk won't work: browsers block ES modules loaded from `file://`.
+
+## Game modes
+
+| Mode | Description |
+|---|---|
+| **Story Mode** | 8 chapters with characters and briefings: duel the local hotshot, team up in the canyon, take on the Neon Syndicate and its boss Vex, then win the Grand Prix. Each win unlocks the next chapter. |
+| **Quick Race** | Any track, 1v1 / 2v2 / 3v3 / 6-car FFA, 1–5 laps, three AI difficulties, powers on or off. |
+| **Knockout** | The last car is eliminated every lap until one remains. |
+| **Local Multiplayer** | 2-player split-screen, as rivals or co-op teammates against AI. |
+| **Online Multiplayer** | Up to 6 players with room codes, plus optional AI fill. |
+| **Challenges** | Time trials, drift scoring, knockout and hard-AI races, with saved personal bests. |
+| **Open World Tour** | Free roam with 45 coins, 6 speed traps, 4 checkpoint sprints and highway traffic. Solo or 2-player. |
+| **Garage** | Four cars with distinct top speed, acceleration, handling and grip, bought with credits. |
+
+**Tracks:** Harbor Loop (day, fast sweepers), Red Canyon (desert, tight hairpins) and Neon City (night, street circuit).
+
+Progress, including credits, cars, powers, story chapters, challenge bests and open-world collectibles, is saved in your browser's `localStorage`.
+
+## Super powers
+
+Unlock powers with credits on the **Super Powers** screen and equip one. The meter refills over time, twice as fast while drifting.
+
+| | Power | Effect | Recharge |
+|---|---|---|---|
+| ⚡ | **Overdrive** | 3 s of massive thrust and +90 km/h top speed | 14 s |
+| 💥 | **Shockwave** | Blasts every car within 24 m off its line | 16 s |
+| 🛡️ | **Aegis Shield** | 5 s immune to hits and EMP; you bulldoze anyone you touch | 18 s |
+| 👻 | **Phantom Phase** | 4 s passing through cars with full grip off-road | 16 s |
+| 🌀 | **EMP Pulse** | Stalls every rival within 110 m for 2.5 s | 20 s |
+| ✦ | **Blink** | Teleports 45 m ahead along the road | 22 s |
+
+## Controls
+
+| Action | Player 1 / Solo | Player 2 | Gamepad |
+|---|---|---|---|
+| Accelerate | `W` (solo: `↑` too) | `↑` | RT |
+| Brake / reverse | `S` | `↓` | LT |
+| Steer | `A` `D` | `←` `→` | Left stick |
+| Handbrake / drift | `Space` | `/` or `Right Ctrl` | A |
+| Nitro | `Left Shift` | `Right Shift` | X / B |
+| Super power | `E` | `Enter` | LB |
+| Reset to road | `R` | `Backspace` | Y |
+| Camera (chase / far / hood) | `C` | `.` | RB |
+| Pause | `Esc` | | |
+
+Drifting fills the nitro bar. Driving off the tarmac costs speed.
+
+## Online multiplayer
+
+Open **Online Multiplayer**, enter a name, and pick a connection type:
+
+| Option | When to use | How friends join |
+|---|---|---|
+| **Host Online Room** | Players in different places | They open the game anywhere and enter the 5-letter code |
+| **Host on Local Network** | Same Wi-Fi, or networks that block peer-to-peer | They open `http://<host-ip>:8000` (printed by `serve.py`) and enter the code |
+
+When joining, the game tries the local relay first and then the internet. The host picks the track, mode, format, laps, AI fill and difficulty in the lobby, and everyone returns there after each race.
+
+**How it works**
+
+- **Star topology.** Clients connect to the host, and the host relays messages to everyone else.
+- **Local authority.** Each browser simulates its own car and broadcasts its state 20 times a second. Remote cars are smoothed and extrapolated between updates.
+- **Host authority.** The host simulates the AI, runs knockout eliminations and decides when the race ends, so every player sees the same results.
+- **Powers as events.** When a power fires, every browser plays the effect and applies it to the cars it owns.
+- **Transports.** Internet rooms use WebRTC data channels through [PeerJS](https://peerjs.com/), whose public broker is only used to connect players. LAN rooms use the WebSocket relay in `serve.py`.
+
+> [!TIP]
+> If players far apart can't connect, a strict NAT is usually blocking peer-to-peer. Use a LAN room, or configure PeerJS with a TURN server.
+
+## Architecture
+
+```
+velocity-rush/
+├── index.html            Entry page and import map
+├── style.css             Menus, HUD and overlays
+├── serve.py              No-cache static server + LAN WebSocket relay
+├── docs/screenshots/     README images
+└── src/
+    ├── main.js           Bootstrap
+    ├── game.js           Renderer, bloom pipeline, 120 Hz fixed-step loop, split-screen viewports
+    ├── car.js            Car mesh and arcade vehicle physics
+    ├── track.js          Spline roads: sampling, nearest-point queries, road / kerb / wall meshes
+    ├── ai.js             Look-ahead steering with bend-aware braking
+    ├── powers.js         Super power definitions, charging, activation, AI usage
+    ├── fx.js             Sparks, shockwave rings, shield shader, light trails
+    ├── session-race.js   Circuit races: grid, laps, ranking, teams, knockout, goals, network sync
+    ├── session-world.js  Open world: terrain, road network, collisions, events, traffic
+    ├── session-menu.js   Showroom scene behind the menus
+    ├── net.js            Rooms over PeerJS (internet) or the WebSocket relay (LAN)
+    ├── env.js            Sky, clouds, mountains, lighting, scenery, grandstands, billboards
+    ├── hud.js            HUD overlay and minimap
+    ├── ui.js             Menus, story, garage, powers, lobby, pause and results screens
+    ├── input.js          Keyboard and gamepad mapping
+    ├── audio.js          Synthesized engine and UI sounds
+    ├── save.js           localStorage persistence
+    └── data.js           Cars, tracks, story chapters, challenges
+```
+
+**Design notes**
+
+- **Sessions.** Each mode is a session object with `update(dt)` (physics), `frame(dt)` (presentation) and a list of views. The game loop runs any of them, including split-screen through scissored viewports.
+- **Tracks.** Every track is a centripetal Catmull-Rom spline sampled every ~2 m. The same samples drive the road meshes, wall collisions, lap counting, AI racing lines and the minimap.
+- **Open-world queries.** A spatial hash over road samples, trees and buildings keeps "which road am I on" and collision checks cheap.
+- **Car physics.** Velocity is split into forward and lateral parts in the car's frame. Grip bleeds off lateral speed, the handbrake lowers grip to start a drift, and the slip angle is capped so drifts stay controllable.
+
+## Roadmap
+
+- [ ] Online sessions in the open world
+- [ ] Car upgrades and a paint shop
+- [ ] More tracks and an in-game track editor
+- [ ] glTF car models and recorded engine audio
+- [ ] Ghost replays for time trials
+- [ ] Touch controls for tablets
+
+---
+
+<div align="center">
+<sub>Built with <a href="https://threejs.org/">Three.js</a> and <a href="https://peerjs.com/">PeerJS</a>.</sub>
+</div>
