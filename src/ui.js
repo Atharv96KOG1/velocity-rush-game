@@ -2,13 +2,17 @@ import { CARS, TRACKS, STORY, CHALLENGES, DIFFICULTY, carById } from './data.js'
 import { save, persist } from './save.js';
 import { RaceSession, fmtTime, TEAM_SIZE, TEAM_COLORS, FFA_COLORS } from './session-race.js';
 import { NetHost, NetClient, MAX_PLAYERS } from './net.js';
-import { AI_NAMES, WEATHER, PAINTS, ACHIEVEMENTS, dailyChallenge } from './data.js';
+import { AI_NAMES, WEATHER, PAINTS, ACHIEVEMENTS, UPGRADES, dailyChallenge, tuneSpec } from './data.js';
 import { unlock } from './achieve.js';
 
 const paintOf = id => save.paint?.[id] ?? carById(id).color;
+const tuneOf = id => save.upgrades?.[id] ?? null;
 const hex = c => '#' + c.toString(16).padStart(6, '0');
 import { WorldSession } from './session-world.js';
 import { initAudio, beep } from './audio.js';
+import { music } from './music.js';
+import { PhotoMode } from './photo.js';
+import { toast } from './achieve.js';
 import { POWERS, powerById } from './powers.js';
 
 const el = html => {
@@ -37,11 +41,13 @@ export class UI {
   constructor(game) {
     this.game = game;
     this.root = document.getElementById('ui');
-    const unlock = () => initAudio();
+    const unlock = () => { initAudio(); music.start(); };
     addEventListener('pointerdown', unlock, { once: true });
     addEventListener('keydown', unlock, { once: true });
     this.root.addEventListener('click', e => { if (e.target.closest('button')) beep(520, 0.05, 'triangle', 0.12); });
   }
+
+  flashNote(text) { toast('AUDIO', text); }
 
   mount(html) {
     this.root.innerHTML = '';
@@ -135,8 +141,8 @@ export class UI {
     node.querySelectorAll('[data-coop]').forEach(b => b.onclick = () => { st.coop = b.dataset.coop === '1'; this.showSetup(humans); });
     node.querySelector('[data-start]').onclick = () => {
       const players = humans === 2
-        ? [{ car: save.car, name: 'P1', power: save.power, color: paintOf(save.car) }, { car: st.p2car, name: 'P2', power: st.p2power, color: paintOf(st.p2car) }]
-        : [{ car: save.car, name: 'YOU', power: save.power, color: paintOf(save.car) }];
+        ? [{ car: save.car, name: 'P1', power: save.power, color: paintOf(save.car), tune: tuneOf(save.car) }, { car: st.p2car, name: 'P2', power: st.p2power, color: paintOf(st.p2car), tune: tuneOf(st.p2car) }]
+        : [{ car: save.car, name: 'YOU', power: save.power, color: paintOf(save.car), tune: tuneOf(save.car) }];
       this.startRace({
         title: humans === 2 ? 'Local Multiplayer' : 'Quick Race',
         type: st.mode, track: st.track, format: st.format,
@@ -154,7 +160,7 @@ export class UI {
 
   // ---------- Online ----------
 
-  me() { return { name: save.name ?? 'Racer', car: save.car, power: save.power, paint: paintOf(save.car), color: paintOf(save.car) }; }
+  me() { return { name: save.name ?? 'Racer', car: save.car, power: save.power, paint: paintOf(save.car), color: paintOf(save.car), tune: tuneOf(save.car) }; }
 
   showOnline(error = '') {
     this.toMenu();
@@ -355,7 +361,7 @@ export class UI {
     return {
       type: s.type, track: s.track, format: s.format ?? 'ffa', laps: s.laps, difficulty: s.difficulty ?? 1,
       goal: s.goal, reward: s.reward, rival: s.rival, weather: s.weather ?? 'clear',
-      humans: [{ car: save.car, name: 'YOU', power: save.power, color: paintOf(save.car) }],
+      humans: [{ car: save.car, name: 'YOU', power: save.power, color: paintOf(save.car), tune: tuneOf(save.car) }],
       powers: s.type === 'race' || s.type === 'knockout', ...extra,
     };
   }
@@ -411,8 +417,8 @@ export class UI {
       const p2car = this.setupState?.p2car && save.owned.includes(this.setupState.p2car) ? this.setupState.p2car : save.owned[0];
       const p2power = this.setupState?.p2power && save.powers.includes(this.setupState.p2power) ? this.setupState.p2power : save.powers[0];
       const humans = n === 2
-        ? [{ car: save.car, name: 'P1', power: save.power, color: paintOf(save.car) }, { car: p2car, name: 'P2', power: p2power, color: paintOf(p2car) }]
-        : [{ car: save.car, name: 'YOU', power: save.power, color: paintOf(save.car) }];
+        ? [{ car: save.car, name: 'P1', power: save.power, color: paintOf(save.car), tune: tuneOf(save.car) }, { car: p2car, name: 'P2', power: p2power, color: paintOf(p2car), tune: tuneOf(p2car) }]
+        : [{ car: save.car, name: 'YOU', power: save.power, color: paintOf(save.car), tune: tuneOf(save.car) }];
       this.root.innerHTML = '';
       this.game.setSession(new WorldSession(this.game, { humans, world: true }));
     });
@@ -427,20 +433,37 @@ export class UI {
     const node = this.mount(`<div class="screen">${this.credits()}
       <div class="h2">GARAGE</div>
       <div class="desc">Click a car to preview it. Earn credits from story, challenges, races and the open world.</div>
-      <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(230px,1fr));max-width:540px">${CARS.map(c => {
+      <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(250px,1fr));max-width:560px">${CARS.map(c => {
         const owned = save.owned.includes(c.id), sel = save.car === c.id;
-        const stat = (label, k) => `<div class="stat">${label}<div class="bar"><i style="width:${Math.round((c[k] / max[k]) * 100)}%"></i></div></div>`;
+        const t = tuneSpec(c, tuneOf(c.id));
+        const stat = (label, k) => `<div class="stat">${label}<div class="bar"><i style="width:${Math.min(100, Math.round((t[k] / max[k]) * 100))}%"></i></div></div>`;
+        const lv = k => tuneOf(c.id)?.[k] ?? 0;
+        const ups = owned ? `<div class="label" style="margin:12px 0 4px">Upgrades</div>${Object.entries(UPGRADES).map(([k, u]) => `<div class="upg" title="${u.desc}">
+          <span>${u.icon} ${u.name}</span><span class="pips">${'●'.repeat(lv(k))}${'○'.repeat(3 - lv(k))}</span>
+          ${lv(k) < 3 ? `<button class="chip" data-up="${c.id}:${k}" ${save.credits < u.prices[lv(k)] ? 'disabled' : ''}>◆ ${u.prices[lv(k)].toLocaleString()}</button>` : '<span class="tag good">MAX</span>'}</div>`).join('')}` : '';
         return `<div class="card ${previewId === c.id ? 'sel' : ''}" data-car="${c.id}">
           <h3><span class="swatch" style="background:${hex(paintOf(c.id))}"></span>${c.name}</h3><p>${c.desc}</p>
           ${stat('Top speed', 'maxSpeed')}${stat('Accel', 'accel')}${stat('Handling', 'handling')}${stat('Grip', 'grip')}
           <div class="row" style="margin-top:12px">${sel ? '<span class="tag good">SELECTED</span>'
             : owned ? `<button class="chip" data-select="${c.id}">Select</button>`
             : `<button class="chip" data-buy="${c.id}" ${save.credits < c.price ? 'disabled' : ''}>Buy ◆ ${c.price.toLocaleString()}</button>`}</div>
+          ${ups}
           ${owned ? `<div class="label" style="margin:12px 0 0">Paint</div><div class="paints">${[c.color, ...PAINTS.filter(p => p !== c.color)].map(p =>
             `<button class="paint ${paintOf(c.id) === p ? 'on' : ''}" style="background:${hex(p)}" data-paint="${c.id}:${p}" title="${hex(p)}"></button>`).join('')}</div>` : ''}</div>`;
       }).join('')}</div>
       <div class="row"><button class="btn inline" data-go="showMain">Back</button></div></div>`);
     node.querySelectorAll('[data-car]').forEach(c => c.onclick = e => { if (!e.target.closest('button')) this.showGarage(c.dataset.car); });
+    node.querySelectorAll('[data-up]').forEach(b => b.onclick = () => {
+      const [id, k] = b.dataset.up.split(':');
+      const cur = save.upgrades[id] ??= { engine: 0, grip: 0, nitro: 0 };
+      const price = UPGRADES[k].prices[cur[k] ?? 0];
+      if ((cur[k] ?? 0) >= 3 || save.credits < price) return;
+      save.credits -= price;
+      cur[k] = (cur[k] ?? 0) + 1;
+      persist();
+      beep(1200, 0.25, 'triangle');
+      this.showGarage(id);
+    });
     node.querySelectorAll('[data-paint]').forEach(b => b.onclick = () => {
       const [id, col] = b.dataset.paint.split(':');
       save.paint[id] = Number(col);
@@ -491,6 +514,25 @@ export class UI {
     });
   }
 
+  // ---------- Photo mode ----------
+
+  photo() {
+    const s = this.game.session;
+    if (this.photoMode || !s.humans || s.cfg?.net || s.over) return;
+    const pm = this.photoMode = new PhotoMode(this.game, () => { this.photoMode = null; this.root.innerHTML = ''; });
+    const render = () => {
+      const node = this.mount(`<div class="photo-bar">
+        <span class="tag">📷 PHOTO MODE</span><span class="photo-hint">Drag to orbit · scroll to zoom</span>
+        ${pm.looks.map((l, i) => `<button class="chip ${pm.look === i ? 'on' : ''}" data-look="${i}">${l}</button>`).join('')}
+        <button class="btn primary inline" data-save>Save Photo</button>
+        <button class="btn inline" data-exit>Exit</button></div>`);
+      node.querySelectorAll('[data-look]').forEach(b => b.onclick = () => { pm.setLook(Number(b.dataset.look)); render(); });
+      node.querySelector('[data-save]').onclick = () => { pm.save(); toast('PHOTO SAVED', 'Check your downloads folder'); };
+      node.querySelector('[data-exit]').onclick = () => pm.exit();
+    };
+    render();
+  }
+
   // ---------- Achievements ----------
 
   showAchievements() {
@@ -521,6 +563,9 @@ export class UI {
         <tr><td>Reset to road</td><td><kbd>R</kbd></td><td><kbd>Backspace</kbd></td><td>Y</td></tr>
         <tr><td>Camera</td><td><kbd>C</kbd></td><td><kbd>.</kbd></td><td>RB</td></tr>
         <tr><td>Super power</td><td><kbd>E</kbd></td><td><kbd>Enter</kbd></td><td>LB</td></tr>
+        <tr><td>Rewind (hold)</td><td><kbd>Q</kbd></td><td></td><td>Back</td></tr>
+        <tr><td>Photo mode</td><td><kbd>P</kbd> or pause menu</td><td></td><td></td></tr>
+        <tr><td>Music on / off</td><td colspan="3"><kbd>M</kbd></td></tr>
         <tr><td>Pause</td><td colspan="3"><kbd>Esc</kbd></td></tr>
       </table>
       <div class="desc" style="margin-top:20px">Drifting fills the nitro bar. Driving flat out on tarmac trickles it too. Off-road slows you down.<br>
@@ -531,6 +576,7 @@ export class UI {
   // ---------- In-game overlays ----------
 
   togglePause() {
+    if (this.photoMode) { this.photoMode.exit(); return; }
     const g = this.game;
     const s = g.session;
     if (this.pauseOpen) { g.paused = false; this.pauseOpen = false; this.root.innerHTML = ''; return; }
@@ -540,10 +586,12 @@ export class UI {
       <div class="h2">PAUSED</div>
       <div class="menu" style="width:100%">
         <button class="btn primary" data-a="resume">Resume</button>
+        ${s.cfg?.net ? '' : '<button class="btn" data-a="photo">Photo Mode<small>Free camera, filters, save PNG</small></button>'}
         ${s.cfg?.world || s.cfg?.net ? '' : '<button class="btn" data-a="restart">Restart</button>'}
         <button class="btn" data-a="quit">${s.cfg?.net ? 'Leave Online Race' : 'Quit to Menu'}</button>
       </div></div></div>`);
     node.querySelector('[data-a=resume]').onclick = () => this.togglePause();
+    node.querySelector('[data-a=photo]')?.addEventListener('click', () => { this.pauseOpen = false; this.game.paused = false; this.photo(); });
     node.querySelector('[data-a=restart]')?.addEventListener('click', () => this.startRace(s.cfg));
     node.querySelector('[data-a=quit]').onclick = () => {
       this.pauseOpen = false;

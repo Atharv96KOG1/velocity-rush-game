@@ -3,7 +3,11 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { SpeedShader } from './post.js';
 import { MenuSession } from './session-menu.js';
+import { music } from './music.js';
+import { save, persist } from './save.js';
 
 // Physics runs on a fixed step so car handling is identical at any frame rate.
 const STEP = 1 / 120;
@@ -24,9 +28,11 @@ export class Game {
     const pr = r.getPixelRatio();
     this.composer = new EffectComposer(r, new THREE.WebGLRenderTarget(innerWidth * pr, innerHeight * pr, { type: THREE.HalfFloatType, samples: 4 }));
     this.renderPass = new RenderPass(null, null);
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.55, 0.5, 0.82);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.55, 0.5, 0.9);
     this.composer.addPass(this.renderPass);
     this.composer.addPass(this.bloom);
+    this.post = new ShaderPass(SpeedShader);
+    this.composer.addPass(this.post);
     this.composer.addPass(new OutputPass());
     this.bloomOn = true;
     addEventListener('resize', () => {
@@ -34,13 +40,21 @@ export class Game {
       this.composer.setSize(innerWidth, innerHeight);
     });
 
-    this.menu = new MenuSession();
+    this.menu = new MenuSession(r);
     this.session = this.menu;
     this.paused = false;
     this.acc = 0;
     this.last = performance.now();
 
+    music.muted = save.music === false;
     addEventListener('keydown', e => {
+      if (e.code === 'KeyM' && !e.repeat && e.target === document.body) {
+        save.music = music.muted;
+        persist();
+        music.setMuted(!music.muted);
+        this.ui?.flashNote(music.muted ? '🔇 Music off (M)' : '🎵 Music on (M)');
+      }
+      if (e.code === 'KeyP' && !e.repeat && this.session.pausable && !this.session.over && !this.session.cfg?.net && !this.ui.pauseOpen) this.ui.photo();
       if (e.code === 'Escape' && this.session.pausable && !this.session.over) this.ui.togglePause();
     });
     r.setAnimationLoop(() => this.frame());
@@ -67,6 +81,7 @@ export class Game {
       if (n === MAX_STEPS) this.acc = 0;
       s.frame(dt);
     }
+    if (music.on) music.set(s === this.menu || this.paused || s.over ? 0.3 : 1, s.post?.speed ?? 0);
     this.render(s);
   }
 
@@ -81,6 +96,12 @@ export class Game {
       this.renderPass.scene = s.scene;
       this.renderPass.camera = cam;
       this.bloom.strength = s.bloomStrength ?? 0.55;
+      const u = this.post.uniforms, p = s.post ?? {};
+      u.speed.value += ((p.speed ?? 0) - u.speed.value) * 0.15;
+      u.look.value = p.look ?? 0;
+      u.rewind.value = p.rewind ? 1 : 0;
+      u.vignette.value = p.vignette ?? 0.35;
+      u.time.value = performance.now() / 1000;
       this.composer.render();
       return;
     }

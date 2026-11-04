@@ -79,6 +79,16 @@ export function makeSky(top, bottom, stars = false, sunColor = 0xfff3d6) {
   return group;
 }
 
+/** Pre-filtered reflection map from a sky, so glossy paint and wet roads reflect it. */
+export function makeEnvMap(renderer, sky) {
+  const pm = new THREE.PMREMGenerator(renderer);
+  const sc = new THREE.Scene();
+  sc.add(sky.children[0].clone()); // gradient dome only: stars and clouds would speckle the paint
+  const rt = pm.fromScene(sc, 0, 1, 3000);
+  pm.dispose();
+  return rt.texture;
+}
+
 export function makeClouds(count = 46) {
   const tex = canvasTex(256, 128, (g, w, h) => {
     for (let i = 0; i < 28; i++) {

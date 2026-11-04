@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { THEMES, CARS, carById } from './data.js';
+import { THEMES, CARS, carById, tuneSpec } from './data.js';
 import { Track } from './track.js';
 import { Car } from './car.js';
 import { AIDriver } from './ai.js';
 import { readControls } from './input.js';
-import { makeSky, makeLights, makeLabel, rng, smoothstep, addTrees, addRocks, addBuildings, canvasTex, makeMountains } from './env.js';
+import { makeEnvMap, makeSky, makeLights, makeLabel, rng, smoothstep, addTrees, addRocks, addBuildings, canvasTex, makeMountains } from './env.js';
 import { ChaseCam, collideCars, Smoke } from './common.js';
 import { HUD, Minimap } from './hud.js';
 import { EngineSound, beep } from './audio.js';
@@ -71,7 +71,10 @@ export class WorldSession {
     const th = THEMES.day;
     const scene = this.scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0xcfe3f5, 250, 1300);
-    scene.add(makeSky(th.skyTop, th.skyBottom));
+    const sky = makeSky(th.skyTop, th.skyBottom);
+    scene.add(sky);
+    scene.environment = makeEnvMap(game.renderer, sky);
+    scene.environmentIntensity = 0.55;
     this.lights = makeLights(scene, th);
     scene.add(makeMountains(0x4b6b4a, 0xcfe3f5, 1700, 40));
     this.bloomStrength = 0.3;
@@ -100,7 +103,7 @@ export class WorldSession {
     // Players start on Central Ave just south of downtown, heading north.
     const ns = this.roadById.ns, si = Math.round(ns.N * 0.36);
     this.humans = cfg.humans.map((h, i) => {
-      const car = new Car(carById(h.car), { name: h.name, human: true, player: i, color: h.color ?? carById(h.car).color });
+      const car = new Car(tuneSpec(carById(h.car), h.tune), { name: h.name, human: true, player: i, color: h.color ?? carById(h.car).color });
       const side = (i - (cfg.humans.length - 1) / 2) * 5;
       const x = ns.px[si] - ns.tz[si] * side, z = ns.pz[si] + ns.tx[si] * side;
       car.place(x, z, Math.atan2(ns.tx[si], ns.tz[si]), roadHeight(x, z) + ROAD_LIFT);
@@ -592,6 +595,8 @@ export class WorldSession {
       this.hud.set(i, this.hudFor(h));
     });
     this.lights.follow(this.humans[0].pos);
+    const p1 = this.humans[0];
+    this.post = { ...this.post, speed: Math.min(1, Math.max(0, (p1.kmh - 150) / 170) + (p1.nitroOn ? 0.25 : 0) + (p1.turbo > 0 ? 0.45 : 0)) };
 
     const markers = [];
     for (const c of this.coins) if (!c.got) markers.push({ x: c.pos.x, z: c.pos.z, r: 2.5, color: '#ffd166' });
@@ -643,6 +648,7 @@ export class WorldSession {
   }
 
   dispose() {
+    this.scene.environment?.dispose();
     for (const h of this.humans) h.engine.stop();
     this.hud.dispose();
     this.smoke.dispose();

@@ -10,6 +10,7 @@ const DEFAULT = {
   challenges: {},           // id -> { done, best }
   world: { coins: [], traps: {}, sprints: {} },
   paint: {},                // carId -> custom colour
+  upgrades: {},             // carId -> { engine, grip, nitro } levels 0..3
   ach: {},                  // achievement id -> true
   stats: { nearMiss: 0, powers: 0 },
   daily: '',                // last completed daily challenge day

@@ -102,3 +102,21 @@ export function dailyChallenge(date = new Date()) {
     default: return { ...base, type: 'knockout', format: 'ffa', laps: 6, difficulty: 1, goal: { type: 'survive' }, desc: 'Survive the knockout.' };
   }
 }
+
+// Performance tuning bought in the garage, per car. Three levels each.
+export const UPGRADES = {
+  engine: { name: 'Engine', icon: '🔧', desc: '+8 km/h top speed and quicker acceleration per level', prices: [800, 1600, 3200] },
+  grip: { name: 'Tyres & Suspension', icon: '🛞', desc: 'More grip and sharper turn-in per level', prices: [700, 1400, 2800] },
+  nitro: { name: 'Nitro System', icon: '🔥', desc: 'Nitro charges 30% faster and lasts longer per level', prices: [600, 1200, 2400] },
+};
+
+export function tuneSpec(spec, t) {
+  if (!t) return spec;
+  const e = t.engine ?? 0, g = t.grip ?? 0, n = t.nitro ?? 0;
+  return {
+    ...spec,
+    maxSpeed: spec.maxSpeed + 2.2 * e, accel: spec.accel + 1.6 * e,
+    grip: spec.grip + 0.45 * g, handling: spec.handling + 0.07 * g,
+    nitroMul: 1 + 0.3 * n,
+  };
+}

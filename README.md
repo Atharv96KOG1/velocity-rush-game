@@ -3,7 +3,7 @@
 # 🏁 Velocity Rush
 
 **A fast 3D arcade racer that runs in your browser.**
-Story campaign · team races · online multiplayer · open world · super powers · dynamic weather
+Story campaign · team races · online multiplayer · open world · super powers · weather · rewind · photo mode
 
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES2022-f7df1e?logo=javascript&logoColor=black)
 ![Three.js](https://img.shields.io/badge/Three.js-r169-000000?logo=threedotjs&logoColor=white)
@@ -25,6 +25,7 @@ Story campaign · team races · online multiplayer · open world · super powers
 - [Game modes](#game-modes)
 - [Super powers](#super-powers)
 - [Style, weather and ghosts](#style-weather-and-ghosts)
+- [Rewind, photo mode and soundtrack](#rewind-photo-mode-and-soundtrack)
 - [Controls](#controls)
 - [Online multiplayer](#online-multiplayer)
 - [Architecture](#architecture)
@@ -43,12 +44,20 @@ Story campaign · team races · online multiplayer · open world · super powers
 - **Paint shop, achievements and daily challenges.** Ten paint colors per car, 12 achievements with rewards, and a new event every day.
 - **Online multiplayer for up to 6 players** with room codes, over the internet (WebRTC) or a built-in LAN relay.
 - **A 2 km × 2 km open world** with downtown, a coastal highway, ridge roads, lakes, traffic and collectibles.
-- **Polished visuals.** Bloom, light trails, sparks, shockwaves, shield bubbles, speed lines, camera shake, a dynamic sky and clouds.
-- **Procedural audio.** Engine and UI sounds are synthesized with WebAudio, so the game ships with no audio files.
+- **Modern visuals.** Smooth sculpted car bodies with clear-coat paint reflecting the sky, bloom, light trails, sparks, shockwaves and a dynamic sky with clouds.
+- **Cinematic post-processing.** Speed-reactive motion blur and chromatic aberration, a vignette, and camera shake on impacts.
+- **Rewind.** Hold `Q` to roll the race back up to 8 seconds, 3 times per race.
+- **Photo mode.** Freeze the action, orbit the camera, apply film looks and save a PNG.
+- **Live soundtrack.** Synthwave music is generated in real time and intensifies with your speed and nitro.
+- **Boost pads and car tuning.** Glowing pads on every circuit, plus engine, grip and nitro upgrades for each car.
+- **Procedural audio.** Music, engine and UI sounds are all synthesized with WebAudio, so the game ships with no audio files.
 
 ## Screenshots
 
 <table>
+  <tr>
+    <td colspan="2"><img src="docs/screenshots/photo-mode.jpg" alt="Photo mode at sunset in Red Canyon"><br><sub><b>Photo mode</b>: clear-coated car at sunset in Red Canyon</sub></td>
+  </tr>
   <tr>
     <td width="50%"><img src="docs/screenshots/neon-city.jpg" alt="Neon City night circuit"><br><sub><b>Neon City</b>: midnight street circuit with Overdrive active</sub></td>
     <td width="50%"><img src="docs/screenshots/red-canyon.jpg" alt="Red Canyon desert circuit"><br><sub><b>Red Canyon</b>: a Shockwave scatters the pack</sub></td>
@@ -90,7 +99,7 @@ Open **http://localhost:8000**.
 | **Online Multiplayer** | Up to 6 players with room codes, plus optional AI fill. |
 | **Challenges** | Time trials, drift scoring, knockout and hard-AI races, with saved personal bests. |
 | **Open World Tour** | Free roam with 45 coins, 6 speed traps, 4 checkpoint sprints and highway traffic. Solo or 2-player. |
-| **Garage** | Four cars with distinct top speed, acceleration, handling and grip, bought with credits. Each one can be repainted. |
+| **Garage** | Four cars with distinct top speed, acceleration, handling and grip, bought with credits. Each one can be repainted and tuned: Engine, Tyres & Suspension and Nitro System, 3 levels each. |
 | **Daily Challenge** | A new race, time trial, drift or knockout every day, generated from the date, with a 1,500 CR reward. |
 | **Achievements** | 12 goals, from breaking 300 km/h to collecting every coin, each paying credits. |
 
@@ -133,6 +142,19 @@ Unlock powers with credits on the **Super Powers** screen and equip one. The met
 
 **Ghost racer.** In time trials and drift events your best run is recorded and saved. Next time, a see-through cyan car replays it, so you're always racing your personal best.
 
+## Rewind, photo mode and soundtrack
+
+**Rewind.** Missed a braking point? Hold `Q` (gamepad: Back) to run the race backwards at double speed, up to 8 seconds, with a blue rewind look. You get 3 rewinds per race. It works in every offline mode except knockout.
+
+**Photo mode.** Press `P` or choose it from the pause menu. The race freezes, the HUD hides, and you can:
+- drag to orbit the car and scroll to zoom
+- pick a look: Natural, Noir, Vivid or Retro
+- click **Save Photo** to download a PNG
+
+**Boost pads.** Every circuit has four glowing chevron pads on its straights. Drive over one for a 1-second surge of thrust; AI drivers use them too.
+
+**Soundtrack.** A synthwave track in A minor (Am–F–C–G, 112 BPM) is synthesized live. The menu plays pads and bass; races add drums and an echoing arpeggio; the filter opens up as you go faster. Press `M` to mute.
+
 ## Controls
 
 | Action | Player 1 / Solo | Player 2 | Gamepad |
@@ -145,6 +167,9 @@ Unlock powers with credits on the **Super Powers** screen and equip one. The met
 | Super power | `E` | `Enter` | LB |
 | Reset to road | `R` | `Backspace` | Y |
 | Camera (chase / far / hood) | `C` | `.` | RB |
+| Rewind (hold) | `Q` | | Back |
+| Photo mode | `P` | | |
+| Music on / off | `M` | | |
 | Pause | `Esc` | | |
 
 Drifting fills the nitro bar. Driving off the tarmac costs speed.
@@ -190,6 +215,10 @@ velocity-rush/
     ├── weather.js        Weather themes, fog ranges, rain particles and lightning
     ├── ghost.js          Ghost run recording and playback
     ├── achieve.js        Achievement unlocks and toast notifications
+    ├── rewind.js         Snapshot ring buffer for rewinding races
+    ├── photo.js          Photo mode orbit camera and PNG export
+    ├── music.js          Procedural synthwave soundtrack
+    ├── post.js           Speed blur, chromatic aberration, vignette and film looks
     ├── fx.js             Sparks, shockwave rings, shield shader, light trails
     ├── session-race.js   Circuit races: grid, laps, ranking, teams, knockout, goals, network sync
     ├── session-world.js  Open world: terrain, road network, collisions, events, traffic
@@ -214,7 +243,6 @@ velocity-rush/
 ## Roadmap
 
 - [ ] Online sessions in the open world
-- [ ] Car performance upgrades
 - [ ] More tracks and an in-game track editor
 - [ ] glTF car models and recorded engine audio
 - [ ] Touch controls for tablets

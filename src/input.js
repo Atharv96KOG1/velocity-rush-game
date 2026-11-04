@@ -9,8 +9,8 @@ addEventListener('keyup', e => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
 
 export const LAYOUTS = [
-  { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], hand: ['Space'], nitro: ['ShiftLeft'], reset: ['KeyR'], cam: ['KeyC'], power: ['KeyE'] },
-  { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], hand: ['Slash', 'ControlRight'], nitro: ['ShiftRight'], reset: ['Backspace'], cam: ['Period'], power: ['Enter', 'Numpad0'] },
+  { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], hand: ['Space'], nitro: ['ShiftLeft'], reset: ['KeyR'], cam: ['KeyC'], power: ['KeyE'], rewind: ['KeyQ'], photo: ['KeyP'] },
+  { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], hand: ['Slash', 'ControlRight'], nitro: ['ShiftRight'], reset: ['Backspace'], cam: ['Period'], power: ['Enter', 'Numpad0'], rewind: [], photo: [] },
 ];
 
 // Single player may use either WASD or the arrow keys.
@@ -29,6 +29,7 @@ export function readControls(player, solo) {
     reset: held(L.reset),
     cam: held(L.cam),
     power: held(L.power),
+    rewind: held(L.rewind),
   };
 
   // Gamepad N drives player N (standard mapping: RT gas, LT brake, A handbrake, X/B nitro, Y reset, RB camera).
@@ -45,6 +46,7 @@ export function readControls(player, solo) {
     c.reset ||= b(3).pressed;
     c.cam ||= b(5).pressed;
     c.power ||= b(4).pressed;
+    c.rewind ||= b(8).pressed;
   }
   return c;
 }

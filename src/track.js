@@ -163,6 +163,34 @@ export class Track {
     return group;
   }
 
+  /** Pick boost-pad spots on the straightest stretches, spread around the lap. */
+  boostPads(count = 4) {
+    const N = this.N, w = Math.round(30 / this.seg), bends = [];
+    for (let i = 0; i < N; i++) {
+      const j = this.wrap(i + w);
+      bends.push({ i, b: 1 - (this.tx[i] * this.tx[j] + this.tz[i] * this.tz[j]) });
+    }
+    bends.sort((a, b) => a.b - b.b);
+    const pads = [], gap = N / (count + 2);
+    for (const c of bends) {
+      if (pads.length >= count) break;
+      if (c.i < 40 || c.i > N - 40) continue;
+      if (pads.some(p => Math.min(Math.abs(p.i - c.i), N - Math.abs(p.i - c.i)) < gap)) continue;
+      pads.push({ i: c.i, lat: [0, -1, 1][pads.length % 3] * this.width * 0.22 });
+    }
+    return pads;
+  }
+
+  padMesh(pad, tex) {
+    const g = new THREE.Group(), i = pad.i;
+    g.position.set(this.px[i] - this.tz[i] * pad.lat, this.lift + 0.03, this.pz[i] + this.tx[i] * pad.lat);
+    g.rotation.y = Math.atan2(this.tx[i], this.tz[i]);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 7).rotateX(-Math.PI / 2).rotateY(Math.PI),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 }));
+    g.add(m);
+    return g;
+  }
+
   startGate(text = 'VELOCITY RUSH') {
     textures();
     const g = new THREE.Group();

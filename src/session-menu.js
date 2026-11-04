@@ -1,17 +1,22 @@
 import * as THREE from 'three';
 import { buildCarMesh } from './car.js';
 import { carById } from './data.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 /** Showroom turntable rendered behind the menus. */
 export class MenuSession {
-  constructor() {
+  constructor(renderer) {
     const scene = this.scene = new THREE.Scene();
+    const pm = new THREE.PMREMGenerator(renderer);
+    scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environmentIntensity = 0.25;
+    pm.dispose();
     scene.background = new THREE.Color(0x07080f);
     scene.fog = new THREE.Fog(0x07080f, 18, 50);
     this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
     this.views = [{ camera: this.camera, rect: [0, 0, 1, 1] }];
     this.pausable = false;
-    this.bloomStrength = 0.6;
+    this.bloomStrength = 0.3;
 
     const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 64), new THREE.MeshStandardMaterial({ color: 0x10131f, metalness: 0.5, roughness: 0.4 }));
     floor.rotation.x = -Math.PI / 2;
@@ -27,14 +32,14 @@ export class MenuSession {
     scene.add(ring);
 
     scene.add(new THREE.HemisphereLight(0x8090ff, 0x101018, 0.7));
-    const key = new THREE.SpotLight(0xffffff, 900, 40, 0.5, 0.6, 1.5);
+    const key = new THREE.SpotLight(0xffffff, 300, 40, 0.5, 0.6, 1.5);
     key.position.set(4, 12, 6);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
     scene.add(key);
-    const pink = new THREE.PointLight(0xff2e63, 60, 20);
+    const pink = new THREE.PointLight(0xff2e63, 25, 20);
     pink.position.set(-5, 2.5, -4);
-    const cyan = new THREE.PointLight(0x08d9d6, 60, 20);
+    const cyan = new THREE.PointLight(0x08d9d6, 25, 20);
     cyan.position.set(5, 2.5, -3);
     scene.add(pink, cyan);
 

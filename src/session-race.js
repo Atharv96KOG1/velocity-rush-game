@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { TRACKS, THEMES, CARS, AI_NAMES, carById, PAYOUT } from './data.js';
+import { TRACKS, THEMES, CARS, AI_NAMES, carById, PAYOUT, tuneSpec } from './data.js';
 import { Track } from './track.js';
 import { Car } from './car.js';
 import { AIDriver } from './ai.js';
 import { readControls, IDLE } from './input.js';
-import { makeSky, makeLights, buildCircuitScenery, makeLabel, groundMesh } from './env.js';
+import { canvasTex, makeEnvMap, makeSky, makeLights, buildCircuitScenery, makeLabel, groundMesh } from './env.js';
 import { ChaseCam, collideCars, Smoke } from './common.js';
 import { HUD, Minimap } from './hud.js';
 import { EngineSound, beep } from './audio.js';
@@ -14,6 +14,7 @@ import { StyleTracker } from './style.js';
 import { weatherTheme, fogRange, Rain } from './weather.js';
 import { GhostRecorder, GhostPlayer, loadGhost } from './ghost.js';
 import { unlock, count } from './achieve.js';
+import { Rewind, REWINDS } from './rewind.js';
 
 const TEAM_COLORS = { A: [0x3a86ff, 0x4cc9f0, 0x4361ee], B: [0xff006e, 0xf72585, 0xff5d8f] };
 const FFA_COLORS = [0xffbe0b, 0x8338ec, 0x06d6a0, 0xfb5607, 0xe5e5e5, 0x118ab2];
@@ -53,7 +54,10 @@ export class RaceSession {
 
     const scene = this.scene = new THREE.Scene();
     scene.fog = new THREE.Fog(th.fog, ...fogRange(weather, th.night));
-    scene.add(makeSky(th.skyTop, th.skyBottom, th.night));
+    const sky = makeSky(th.skyTop, th.skyBottom, th.night);
+    scene.add(sky);
+    scene.environment = makeEnvMap(game.renderer, sky);
+    scene.environmentIntensity = th.night ? 1.2 : 0.55;
     this.lights = makeLights(scene, th);
     this.bloomStrength = th.night ? 0.95 : 0.35;
     scene.add(groundMesh(th));
@@ -61,6 +65,19 @@ export class RaceSession {
     const track = this.track = new Track(def.points, { width: def.width });
     scene.add(track.buildMesh({ walls: true, wallGap: 3.5, night: th.night, wet: weather === 'rain' }));
     scene.add(track.startGate());
+
+    // Boost pads: glowing chevrons that scroll toward the driver.
+    this.padTex = canvasTex(64, 128, (g, w, h) => {
+      g.clearRect(0, 0, w, h);
+      g.fillStyle = 'rgba(8,217,214,.35)';
+      g.fillRect(0, 0, w, h);
+      g.strokeStyle = '#7ff6ff';
+      g.lineWidth = 9;
+      for (let y = -20; y < h; y += 42) { g.beginPath(); g.moveTo(6, y + 30); g.lineTo(w / 2, y); g.lineTo(w - 6, y + 30); g.stroke(); }
+    });
+    this.padTex.repeat.set(1, 2);
+    this.pads = track.boostPads(4);
+    for (const p of this.pads) scene.add(track.padMesh(p, this.padTex));
     scene.add(buildCircuitScenery(track, th));
     this.smoke = new Smoke(scene);
     if (weather === 'rain') this.rain = new Rain(scene, this.lights.hemi);
@@ -117,6 +134,9 @@ export class RaceSession {
     if (this.ghost) this.hud.msg(`👻 GHOST: YOUR BEST ${fmtTime(this.ghost.data.time)}`, 4);
     if (weather === 'rain') this.hud.msg('🌧️ WET TRACK · LESS GRIP', 3);
 
+    // Rewind: offline only (online races can't roll back other players), not in knockout.
+    if (!this.net && cfg.type !== 'knockout') this.rewind = new Rewind(this);
+
     this.state = 'countdown';
     this.clock = 3.6;
     this.lastCount = 4;
@@ -170,7 +190,7 @@ export class RaceSession {
       let car;
       if (e.human >= 0) {
         const h = humanCfg[e.human];
-        const spec = carById(h.car);
+        const spec = tuneSpec(carById(h.car), h.tune);
         car = new Car(spec, { name: h.name, team: e.team, human: true, player: e.human, color: h.color ?? spec.color });
       } else {
         const spec = CARS[Math.floor(Math.random() * CARS.length)];
@@ -192,7 +212,7 @@ export class RaceSession {
     const { cfg, net } = this;
     cfg.entries.forEach((e, k) => {
       const local = e.id === net.localId;
-      const car = new Car(carById(e.car), { name: e.name, team: e.team, human: local, player: local ? 0 : -1, color: e.color ?? carById(e.car).color });
+      const car = new Car(local ? tuneSpec(carById(e.car), cfg.humans[0].tune) : carById(e.car), { name: e.name, team: e.team, human: local, player: local ? 0 : -1, color: e.color ?? carById(e.car).color });
       car.id = e.id;
       car.netPlayer = e.kind === 'player';
       car.remote = !local && !(e.kind === 'ai' && this.authority);
@@ -349,6 +369,7 @@ export class RaceSession {
   // ---------- Simulation (fixed step) ----------
 
   update(dt) {
+    if (this.rewind?.active) return;
     const counting = this.state === 'countdown';
     if (counting) {
       this.clock -= dt;
@@ -397,6 +418,7 @@ export class RaceSession {
       for (const c of [a, b]) if (c.cam) c.cam.shake = Math.max(c.cam.shake, Math.min(1, v / 15));
     });
     this.rank();
+    if (this.rewind && this.state === 'race') this.rewind.record(dt);
     this.style.update(dt, this.cars, this.state === 'race');
     if (this.recorder && this.state === 'race' && !this.humans[0].finished) this.recorder.record(this.time, this.humans[0]);
     this.rubberBand();
@@ -423,6 +445,13 @@ export class RaceSession {
         car.vx -= rx * vn * 1.35;
         car.vz -= rz * vn * 1.35;
         car.vx *= 0.99; car.vz *= 0.99;
+      }
+    }
+    for (const p of this.pads) {
+      const di = Math.abs(i - p.i);
+      if (Math.min(di, t.N - di) <= 2 && Math.abs(lat - p.lat) < 2.6) {
+        if (car.padBoost < 0.2 && car.isHuman) { beep(1300, 0.12, 'triangle', 0.15); if (car.cam) car.cam.shake = Math.max(car.cam.shake, 0.3); }
+        car.padBoost = 1.1;
       }
     }
     const prev = car.trackIndex, N = t.N;
@@ -639,6 +668,7 @@ export class RaceSession {
       }
     }
     this.ghost?.update(this.time);
+    this.padTex.offset.y = (this.padTex.offset.y - dt * 1.6) % 1;
     this.smoke.update(dt);
     this.fx.sparks.update(dt);
     this.fx.rings.update(dt);
@@ -651,6 +681,16 @@ export class RaceSession {
     }
     this.hud.tick(dt);
     if (this.net && this.state !== 'done') this.sendState(dt);
+
+    if (this.rewind) {
+      const held = this.state === 'race' && readControls(0, this.humans.length === 1).rewind;
+      const was = this.rewind.active;
+      if (this.rewind.step(held)) {
+        for (const car of this.cars) car.syncMesh();
+        if (!was) { this.hud.msg(`◀◀ REWIND · ${this.rewind.left} LEFT`, 1.5, null, '#a0c4ff'); beep(300, 0.3, 'sine', 0.2); }
+      } else if (held && !was && this.rewind.left === 0) this.hud.msg('NO REWINDS LEFT', 1);
+      this.post = { ...this.post, rewind: this.rewind.active };
+    }
 
     this.humans.forEach((h, i) => {
       const c = readControls(h.player, this.humans.length === 1);
@@ -665,6 +705,8 @@ export class RaceSession {
       this.hud.set(i, this.hudFor(h));
     });
     this.lights.follow(this.humans[0].pos);
+    const p1 = this.humans[0];
+    this.post = { ...this.post, speed: Math.min(1, Math.max(0, (p1.kmh - 150) / 170) + (p1.nitroOn ? 0.25 : 0) + (p1.turbo > 0 ? 0.45 : 0) + (p1.padBoost > 0 ? 0.3 : 0)) };
 
     if (this.teamMode) {
       const n = this.cars.length, pts = { A: 0, B: 0 };
@@ -697,6 +739,7 @@ export class RaceSession {
     if (h.bestLap) lines.push(`BEST ${fmtTime(h.bestLap)}`);
     if (cfg.goal?.type === 'time') lines.push(`TARGET ${fmtTime((this.track.length * cfg.laps) / cfg.goal.avg)}`);
     if (this.dnf != null && !h.finished) lines.push(`⏱ ${Math.ceil(this.dnf)}s LEFT`);
+    if (this.rewind && h.player === 0) lines.push(`◀◀ Q  ${'●'.repeat(this.rewind.left)}${'○'.repeat(REWINDS - this.rewind.left)}`);
 
     let drift = '';
     if (cfg.type === 'drift' || cfg.goal?.type === 'drift') {
@@ -709,6 +752,7 @@ export class RaceSession {
   }
 
   dispose() {
+    this.scene.environment?.dispose();
     this.unsub?.forEach(f => f());
     for (const h of this.humans) h.engine.stop();
     this.hud.dispose();

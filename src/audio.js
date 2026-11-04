@@ -14,6 +14,8 @@ export function initAudio() {
   }
 }
 
+export const audio = () => ({ ctx, master });
+
 export function beep(freq = 660, dur = 0.15, type = 'square', vol = 0.25) {
   if (!ctx) return;
   const o = ctx.createOscillator(), g = ctx.createGain();
