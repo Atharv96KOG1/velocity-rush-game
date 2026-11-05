@@ -46,7 +46,7 @@ export class Items {
 
     // Rows of three boxes spread around the lap, clear of ramps and boost pads.
     this.boxes = [];
-    const busy = [...s.pads.map(p => p.i), ...action.ramps.map(r => r.i), 0];
+    const busy = [...s.pads.map(p => p.i), ...action.ramps.map(r => r.i), ...action.obstacles.map(o => o.i), 0];
     const clear = i => busy.every(b => Math.min(Math.abs(b - i), t.N - Math.abs(b - i)) > 25);
     for (let k = 0; k < 4; k++) {
       let i = Math.round((t.N * (k + 0.55)) / 4);
@@ -66,8 +66,13 @@ export class Items {
     this.flash = new THREE.PointLight(0xffa040, 0, 45, 1.5);
     scene.add(this.flash);
     this.keys = new Map();
+    this.seq = 0;
     for (const c of s.cars) c.item = null;
   }
+
+  // Online: each client handles pickups, hits and item use for the cars it owns,
+  // and tells the others through the host.
+  send(m) { this.s.net?.send(m); }
 
   // ---------- Pickups ----------
 
@@ -85,13 +90,17 @@ export class Items {
 
   // ---------- Using items ----------
 
-  use(car) {
-    const s = this.s, id = car.item;
+  use(car, net = null) {
+    const s = this.s, id = net ? net.item : car.item;
     if (!id) return;
     car.item = null;
+    const uid = net ? net.uid : `${car.id ?? 'p'}-${this.seq++}`;
     const fx = Math.sin(car.yaw), fz = Math.cos(car.yaw);
+    let target = null;
+    if (id === 'missile') target = net ? s.byId?.get(net.tid) ?? null : this.targetFor(car);
+    const drop = net ? { x: net.x, z: net.z } : { x: car.pos.x - fx * 4, z: car.pos.z - fz * 4 };
+    if (!net) this.send({ t: 'use', id: car.id, item: id, uid, tid: target?.id ?? null, x: drop.x, z: drop.z });
     if (id === 'missile') {
-      const target = this.targetFor(car);
       const g = new THREE.Group();
       const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.4, 10).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xe8e8e8, metalness: 0.6, roughness: 0.3 }));
       const tip = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.5, 10).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff3030).multiplyScalar(4), toneMapped: false }));
@@ -101,11 +110,11 @@ export class Items {
       g.add(body, tip, glow);
       g.position.set(car.pos.x + fx * 3, car.pos.y + 1.1, car.pos.z + fz * 3);
       s.scene.add(g);
-      this.missiles.push({ g, owner: car, target, dir: new THREE.Vector3(fx, 0, fz), life: 5 });
+      this.missiles.push({ uid, g, owner: car, target, dir: new THREE.Vector3(fx, 0, fz), life: 5 });
       if (target?.isHuman) s.hud.msg('🚀 MISSILE INCOMING!', 1.5, target.player, '#ff4d4d');
       beep(200, 0.4, 'sawtooth', 0.2);
     } else if (id === 'mine' || id === 'oil') {
-      const p = new THREE.Vector3(car.pos.x - fx * 4, 0, car.pos.z - fz * 4);
+      const p = new THREE.Vector3(drop.x, 0, drop.z);
       let m;
       if (id === 'mine') {
         m = new THREE.Group();
@@ -121,18 +130,18 @@ export class Items {
         m.position.set(p.x, 0.08, p.z);
       }
       s.scene.add(m);
-      this.hazards.push({ id, m, pos: p, owner: car, armed: 0.6, life: id === 'mine' ? 40 : 25, hit: new Map() });
+      this.hazards.push({ uid, id, m, pos: p, owner: car, armed: 0.6, life: id === 'mine' ? 40 : 25, hit: new Map() });
       beep(id === 'mine' ? 300 : 180, 0.15, 'square', 0.15);
     } else if (id === 'bubble') {
       car.shield = 6;
       this.ensureShield(car);
-      if (car.isHuman) s.style.event(car, 'BUBBLE SHIELD', 50, '#5bc0ff');
+      if (car.isHuman && !net) s.style.event(car, 'BUBBLE SHIELD', 50, '#5bc0ff');
       beep(800, 0.2, 'sine', 0.2);
     } else if (id === 'rocket') {
       car.shockNitro = 2.6;
       s.fx.rings.emit(car.pos.x - fx * 2, car.pos.y, car.pos.z - fz * 2, 0xffb703, 14, 0.45);
       s.fx.sparks.emit(car.pos.x - fx * 2.5, car.pos.y + 0.5, car.pos.z - fz * 2.5, 60, 0xffb703, 10, 2);
-      if (car.isHuman) { s.style.event(car, 'ROCKET BOOST', 80, '#ffb703'); car.cam.shake = 0.6; }
+      if (car.isHuman && !net) { s.style.event(car, 'ROCKET BOOST', 80, '#ffb703'); car.cam.shake = 0.6; }
       beep(90, 0.5, 'sawtooth', 0.3);
     }
   }
@@ -180,21 +189,23 @@ export class Items {
     const s = this.s, cars = s.cars.filter(c => !c.eliminated);
     if (!s.powers) for (const c of cars) c.shield = Math.max(0, (c.shield ?? 0) - dt);
 
-    for (const b of this.boxes) {
-      if (b.down > 0) { b.down -= dt; continue; }
-      for (const c of cars) {
+    const owned = cars.filter(c => !c.remote);
+    this.boxes.forEach((b, bi) => {
+      if (b.down > 0) { b.down -= dt; return; }
+      for (const c of owned) {
         if (c.wreck > 0 || c.pos.y > 3) continue;
         if (Math.abs(c.pos.x - b.m.position.x) < 2.2 && Math.abs(c.pos.z - b.m.position.z) < 2.2) {
           b.down = RESPAWN;
+          this.send({ t: 'box', b: bi });
           s.fx.sparks.emit(b.m.position.x, 1.3, b.m.position.z, 40, new THREE.Color().setHSL(Math.random(), 1, 0.6).getHex(), 7, 4);
           if (!c.item) this.give(c);
           break;
         }
       }
-    }
+    });
 
     // Using items: players press the item key, the AI picks its moment.
-    for (const c of cars) {
+    for (const c of owned) {
       if (!c.item || c.wreck > 0 || s.state !== 'race') continue;
       c.itemAge += dt;
       if (c.isHuman) {
@@ -215,11 +226,12 @@ export class Items {
       m.g.position.y = 1.1;
       m.g.rotation.y = Math.atan2(m.dir.x, m.dir.z);
       if (Math.random() < 0.7) s.smoke.emit(m.g.position.x - m.dir.x * 1.2, 0.9, m.g.position.z - m.dir.z * 1.2, 0.7);
-      for (const c of cars) {
+      for (const c of owned) {
         if (c === m.owner || c.wreck > 0) continue;
         if (Math.hypot(c.pos.x - m.g.position.x, c.pos.z - m.g.position.z) < 2.6) {
           this.explode(m.g.position);
           this.strike(c, m.owner, 'MISSILE HIT');
+          this.send({ t: 'mh', uid: m.uid });
           m.hit = true;
           break;
         }
@@ -232,12 +244,13 @@ export class Items {
     for (const h of this.hazards) {
       h.life -= dt;
       h.armed -= dt;
-      for (const c of cars) {
+      for (const c of owned) {
         if (c.wreck > 0 || c.air || (h.armed > 0 && c === h.owner)) continue;
         const d = Math.hypot(c.pos.x - h.pos.x, c.pos.z - h.pos.z);
         if (h.id === 'mine' && d < 2.6) {
           this.explode(h.pos, 0xff2e63);
           this.strike(c, h.owner, 'MINE HIT');
+          this.send({ t: 'hz', uid: h.uid });
           h.life = 0;
           break;
         }
@@ -261,6 +274,21 @@ export class Items {
       c.spinOut -= dt;
       c.visYaw = (1 - Math.max(0, c.spinOut)) * Math.PI * 4;
       if (c.spinOut <= 0) c.visYaw = 0;
+    }
+  }
+
+  onNet(m) {
+    const s = this.s;
+    if (m.t === 'box') { const b = this.boxes[m.b]; if (b) b.down = RESPAWN; return; }
+    if (m.t === 'use') { const car = s.byId?.get(m.id); if (car) this.use(car, m); return; }
+    if (m.t === 'mh') {
+      const mi = this.missiles.find(x => x.uid === m.uid);
+      if (mi) { this.explode(mi.g.position); mi.hit = true; mi.life = 0; }
+      return;
+    }
+    if (m.t === 'hz') {
+      const h = this.hazards.find(x => x.uid === m.uid);
+      if (h) { this.explode(h.pos, 0xff2e63); h.life = 0; }
     }
   }
 

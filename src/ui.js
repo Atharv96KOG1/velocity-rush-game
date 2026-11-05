@@ -98,7 +98,7 @@ export class UI {
 
   showSetup(humans) {
     this.toMenu();
-    const st = this.setupState ??= { track: 'harbor', format: '1v1', laps: 3, diff: 'normal', coop: false, mode: 'race', p2car: save.owned[0], powers: 'on', p2power: save.powers[0], weather: 'clear', police: 'off' };
+    const st = this.setupState ??= { track: 'harbor', format: '1v1', laps: 3, diff: 'normal', coop: false, mode: 'race', p2car: save.owned[0], powers: 'on', p2power: save.powers[0], weather: 'clear', police: 'off', items: 'on' };
     if (!save.owned.includes(st.p2car)) st.p2car = save.owned[0];
     if (!save.powers.includes(st.p2power)) st.p2power = save.powers[0];
     if (humans === 1 || st.format === '1v1') st.coop = false;
@@ -126,6 +126,8 @@ export class UI {
       <div class="chips">${chips('weather', Object.keys(WEATHER), v => `${WEATHER[v].icon} ${WEATHER[v].label}`)}</div>
       <div class="label">Super Powers</div>
       <div class="chips">${chips('powers', ['on', 'off'], v => v === 'on' ? `ON · ${powerById(save.power).icon} ${powerById(save.power).name}` : 'OFF')}</div>
+      <div class="label">Mystery Boxes & Weapons</div>
+      <div class="chips">${chips('items', ['on', 'off'], v => v === 'on' ? '🎁 ON' : 'OFF')}</div>
       <div class="label">Police</div>
       <div class="chips">${chips('police', ['off', 'on'], v => v === 'on' ? '🚨 COPS CHASE YOU' : 'NO POLICE')}</div>
       ${humans === 2 && st.powers === 'on' ? `<div class="label">P2 Power</div><div class="chips">${save.powers.map(id => `<button class="chip ${st.p2power === id ? 'on' : ''}" data-k="p2power" data-v="${id}">${powerById(id).icon} ${powerById(id).name}</button>`).join('')}</div>` : ''}
@@ -153,7 +155,7 @@ export class UI {
         title: humans === 2 ? 'Local Multiplayer' : 'Quick Race',
         type: st.mode, track: st.track, format: st.format,
         laps: st.mode === 'knockout' ? 6 : st.laps,
-        difficulty: DIFFICULTY[st.diff], humans: players, coop: st.coop, powers: st.powers === 'on', weather: st.weather, police: st.police === 'on',
+        difficulty: DIFFICULTY[st.diff], humans: players, coop: st.coop, powers: st.powers === 'on', weather: st.weather, police: st.police === 'on', items: (st.items ?? 'on') === 'on',
       });
     };
   }
@@ -212,7 +214,7 @@ export class UI {
   attachNet(net) {
     this.net = net;
     if (net.role === 'host') {
-      net.setSettings(this.netSettings ??= { track: 'harbor', mode: 'race', format: 'ffa', laps: 3, diff: 'normal', powers: true, fill: true, weather: 'clear' });
+      net.setSettings(this.netSettings ??= { track: 'harbor', mode: 'race', format: 'ffa', laps: 3, diff: 'normal', powers: true, fill: true, weather: 'clear', items: true, police: false });
     }
     this.netOff = [
       net.on('lobby', () => { if (this.inLobby) this.showLobby(); }),
@@ -269,6 +271,10 @@ export class UI {
       <div class="chips">${chips('weather', Object.keys(WEATHER), v => `${WEATHER[v].icon} ${WEATHER[v].label}`)}</div>
       <div class="label">Super Powers</div>
       <div class="chips">${chips('powers', [true, false], v => v ? 'ON' : 'OFF')}</div>
+      <div class="label">Mystery Boxes & Weapons</div>
+      <div class="chips">${chips('items', [true, false], v => v ? '🎁 ON' : 'OFF')}</div>
+      <div class="label">Police</div>
+      <div class="chips">${chips('police', [false, true], v => v ? '🚨 COPS ON' : 'NO POLICE')}</div>
       <div class="desc" style="margin-top:14px">${slots.total} cars on the grid${slots.ai ? ` (${slots.ai} AI)` : ''}.</div>
       <div class="row">
         ${host ? `<button class="btn primary inline" data-start ${slots.total < 2 ? 'disabled' : ''}>Start Race</button>` : ''}
@@ -329,6 +335,7 @@ export class UI {
     this.startRace({
       title: 'Online Race', type: st.mode, track: st.track, format: st.format,
       laps: st.mode === 'knockout' ? 6 : st.laps, difficulty: DIFFICULTY[st.diff], powers: st.powers, weather: st.weather ?? 'clear',
+      items: st.items ?? true, police: !!st.police,
       humans: [this.me()], entries: msg.entries, net: this.net,
     });
   }

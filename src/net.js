@@ -145,7 +145,7 @@ class CloudHostPeer extends Emitter {
 }
 
 // Messages relayed by the host to every other client.
-const RELAY = new Set(['s', 'pw']);
+const RELAY = new Set(['s', 'pw', 'wk', 'sw', 'box', 'use', 'hz', 'mh']);
 
 export class NetHost extends Emitter {
   /** Internet room: listens for direct (WebRTC) and cloud-relay joins under the same code. */

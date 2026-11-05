@@ -24,7 +24,7 @@ export const TEAM_SIZE = { '1v1': 1, '2v2': 2, '3v3': 3 };
 export { TEAM_COLORS, FFA_COLORS };
 const NET_RATE = 1 / 20;
 // State flag bits sent over the network.
-const F = { nitro: 1, turbo: 2, shield: 4, ghost: 8, stun: 16, brake: 32, drift: 64 };
+const F = { nitro: 1, turbo: 2, shield: 4, ghost: 8, stun: 16, brake: 32, drift: 64, shock: 128, pad: 256 };
 
 export const fmtTime = t => {
   if (t == null || !isFinite(t)) return '—';
@@ -139,8 +139,9 @@ export class RaceSession {
     if (weather === 'rain') this.hud.msg('🌧️ WET TRACK · LESS GRIP', 3);
     else if (th.scenery === 'snow') this.hud.msg('❄️ ICY TRACK · LESS GRIP', 3);
 
-    // Ramps, takedowns, shockwave nitro, police and the countdown flyby (offline races).
-    if (!this.net) this.action = new Action(this);
+    // Ramps, obstacles, takedowns, shockwave nitro, police and the countdown flyby.
+    // Online, every client runs it for the cars it owns and syncs events through the host.
+    this.action = new Action(this);
     // Mystery boxes and weapons, on by default in offline races.
     if (this.action && !this.solo && (cfg.items ?? true)) this.items = new Items(this, this.action);
 
@@ -284,9 +285,12 @@ export class RaceSession {
     if (c.stun > 0) f |= F.stun;
     if (c.braking) f |= F.brake;
     if (c.drifting) f |= F.drift;
+    if (c.shockNitro > 0) f |= F.shock;
+    if (c.padBoost > 0) f |= F.pad;
     const r = v => Math.round(v * 100) / 100;
     return [c.id, r(c.pos.x), r(c.pos.z), r(c.yaw), r(c.vx), r(c.vz), r(c.fwdSpeed), r(c.latSpeed), r(c.steerVis),
-      c.lap, c.trackIndex, r(c.boost), f, c.finished ? r(c.finishTime) : -1, Math.round(c.driftScore), c.bestLap == null ? -1 : r(c.bestLap)];
+      c.lap, c.trackIndex, r(c.boost), f, c.finished ? r(c.finishTime) : -1, Math.round(c.driftScore), c.bestLap == null ? -1 : r(c.bestLap),
+      r(c.pos.y), r(c.pitch), r(c.roll), r(c.visYaw)];
   }
 
   onNet(m) {
@@ -295,8 +299,10 @@ export class RaceSession {
         for (const a of m.c) {
           const car = this.byId.get(a[0]);
           if (!car || !car.remote) continue;
-          const [, x, z, yaw, vx, vz, fwd, lat, steer, lap, ti, boost, f, fin, drift, best] = a;
-          car.net = { x, z, yaw, vx, vz, at: performance.now() / 1000 };
+          const [, x, z, yaw, vx, vz, fwd, lat, steer, lap, ti, boost, f, fin, drift, best, y = 0, pitch = 0, roll = 0, visYaw = 0] = a;
+          car.net = { x, z, yaw, vx, vz, y, at: performance.now() / 1000 };
+          car.pitch = pitch; car.roll = roll; car.visYaw = visYaw;
+          car.shockNitro = f & F.shock ? 0.3 : 0; car.padBoost = f & F.pad ? 0.3 : 0;
           car.fwdSpeed = fwd; car.latSpeed = lat; car.steerVis = steer; car.boost = boost;
           car.nitroOn = !!(f & F.nitro); car.braking = !!(f & F.brake); car.drifting = !!(f & F.drift);
           car.turbo = f & F.turbo ? 0.3 : 0; car.shield = f & F.shield ? 0.3 : 0;
@@ -306,6 +312,10 @@ export class RaceSession {
           car.bestLap = best < 0 ? null : best;
           if (fin >= 0 && !car.finished) { car.finished = true; car.finishTime = fin; }
         }
+        break;
+      case 'wk': case 'sw': case 'box': case 'use': case 'hz': case 'mh':
+        this.action?.onNet(m);
+        this.items?.onNet(m);
         break;
       case 'pw': {
         const car = this.byId.get(m.id);
@@ -354,6 +364,7 @@ export class RaceSession {
       const k = 1 - Math.exp(-dt * 14);
       car.pos.x += dx * k; car.pos.z += dz * k;
     }
+    car.pos.y += ((n.y ?? 0) - car.pos.y) * (1 - Math.exp(-dt * 16));
     let dy = n.yaw - car.yaw;
     dy = Math.atan2(Math.sin(dy), Math.cos(dy));
     car.yaw += dy * (1 - Math.exp(-dt * 14));
@@ -365,7 +376,7 @@ export class RaceSession {
     this.netT += dt;
     if (this.netT < NET_RATE) return;
     this.netT = 0;
-    const mine = this.cars.filter(c => !c.remote && !c.left);
+    const mine = [...this.cars, ...(this.authority ? this.action?.cops ?? [] : [])].filter(c => !c.remote && !c.left);
     if (mine.length) this.net.send({ t: 's', c: mine.map(c => this.packState(c)) });
   }
 
@@ -400,8 +411,8 @@ export class RaceSession {
 
     for (const car of this.cars) {
       if (car.eliminated) continue;
-      if (car.remote) { this.followNet(car, dt); continue; }
       if (car.wreck > 0) continue;
+      if (car.remote) { this.followNet(car, dt); continue; }
       let c;
       if (counting) c = IDLE;
       else if (car.isHuman && !car.finished && this.state !== 'done') c = readControls(car.player, this.humans.length === 1);
@@ -729,6 +740,7 @@ export class RaceSession {
     this.action?.frame(dt);
     this.items?.frame(dt);
     hideNearCameras([...this.cars, ...(this.action?.cops ?? [])], this.humans.map(h => h.cam.camera));
+    this.action?.blinkCars(dt);
     this.lights.follow(this.humans[0].pos);
     const p1 = this.humans[0];
     this.post = { ...this.post, speed: Math.min(1, Math.max(0, (p1.kmh - 150) / 170) + (p1.nitroOn ? 0.25 : 0) + (p1.turbo > 0 ? 0.45 : 0) + (p1.padBoost > 0 ? 0.3 : 0) + (p1.shockNitro > 0 ? 0.6 : 0)) };

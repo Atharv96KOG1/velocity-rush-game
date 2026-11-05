@@ -95,7 +95,7 @@ Story campaign · weapons & mystery boxes · jumps & flips · police chases · t
 The current version is shown in the bottom-right corner of the main menu.
 
 > [!NOTE]
-> Mystery boxes, jumps and flips, police, ramps and takedowns are in **offline races**: Quick Race, Local Multiplayer, Story and Challenges. They aren't in Online Multiplayer or the Open World yet.
+> Mystery boxes, jumps and flips, police, ramps, roadblocks and takedowns work in every race mode, including **Online Multiplayer**. They aren't in the Open World yet.
 
 **Run locally** (needed for local-network multiplayer). Requires Python 3 and a modern desktop browser (Chrome, Edge, Firefox or Safari).
 
@@ -127,12 +127,18 @@ Open **http://localhost:8000**.
 | **Daily Challenge** | A new race, time trial, drift or knockout every day, generated from the date, with a 1,500 CR reward. |
 | **Achievements** | 12 goals, from breaking 300 km/h to collecting every coin, each paying credits. |
 
+**Roadblocks.** Every circuit has barrel stacks and concrete blocks in the lanes (14 on hard tracks, 5 on the others).
+- **Barrel stacks:** smash straight through them, at the cost of speed. They come back 8 seconds later.
+- **Concrete blocks:** you bounce off, and hit one above about 80 km/h and you're wrecked.
+- **Jump them:** press `F` to clear either kind.
+- AI drivers and cops swerve around them.
+
 **Tracks:**
 - Harbor Loop: day, fast sweepers
 - Red Canyon: desert, tight hairpins
 - Neon City: night street circuit
-- **Skyline Gauntlet (hard):** narrow night streets with four hairpins
-- **Glacier Run (hard):** snowy mountain pass with low grip and falling snow
+- **Skyline Gauntlet (hard):** 12 m wide night streets, four hairpins, 3 ramps, 14 roadblocks
+- **Glacier Run (hard):** 13 m wide snowy pass with low grip, falling snow, 3 ramps, 14 roadblocks
 
 Progress, including credits, cars, powers, story chapters, challenge bests and open-world collectibles, is saved in your browser's `localStorage`.
 
@@ -161,7 +167,12 @@ Unlock powers with credits on the **Super Powers** screen and equip one. The met
 | `A` / `D` | 360 spin | 220 per rotation |
 | `Space` + `A` / `D` | Barrel roll | 320 per rotation |
 
-Mix them for DOUBLE and TRIPLE combos; two or more in one jump shouts **INSANE!** Every trick refills nitro. Land within about 60° of wheels-down or you crash (**BAD LANDING**).
+Mix them for DOUBLE and TRIPLE combos; two or more in one jump shouts **INSANE!** Every trick refills nitro.
+- **Keys you're already holding when you take off don't count.** Holding the gas through a jump won't start an accidental flip.
+- **Hands off = auto-level.** When you're not pressing a trick key, the car settles back to wheels-down on its own, so a plain jump always lands as a **PERFECT LANDING**.
+- **Still rotating at touchdown** gives a **SLOPPY LANDING**: you lose speed and score nothing, but you keep racing.
+
+**Respawn.** Crash and you're back on the road about 2.6 seconds later, upright, at 80 km/h. You blink and can't be hit for 2 seconds.
 
 **Mystery boxes.** Four rows of three spinning **?** boxes sit on every circuit and come back 4 seconds after they're hit. Drive through one with an empty slot to get a random item, then press `X` (P2: `'`, gamepad Y) to use it. Leaders mostly get defensive items; cars at the back get weapons and speed.
 
@@ -268,7 +279,10 @@ When joining, the game tries the local relay first and then the internet. The ho
 
 - **Star topology.** Clients connect to the host, and the host relays messages to everyone else.
 - **Local authority.** Each browser simulates its own car and broadcasts its state 20 times a second. Remote cars are smoothed and extrapolated between updates.
-- **Host authority.** The host simulates the AI, runs knockout eliminations and decides when the race ends, so every player sees the same results.
+- **Host authority.** The host simulates the AI and the police, runs knockout eliminations and decides when the race ends, so every player sees the same results.
+- **Ownership.** Each browser decides pickups, item hits, landings and crashes for the cars it owns, then broadcasts the result. Everyone sees the same mystery boxes, missiles, mines, wrecks and stunts.
+- **Lobby toggles.** The host can turn mystery boxes and police on or off.
+- **Slow motion** is local-only, so it's turned off online.
 - **Powers as events.** When a power fires, every browser plays the effect and applies it to the cars it owns.
 - **Transports.** Internet rooms first try WebRTC data channels through [PeerJS](https://peerjs.com/) (direct, lowest latency). If a strict router, mobile hotspot or office network blocks that, the joiner falls back to a cloud relay: public MQTT brokers over secure WebSockets (EMQX, HiveMQ, Mosquitto). LAN rooms use the WebSocket relay in `serve.py`. Game traffic on the public relay is not encrypted end to end, so don't put personal information in player names.
 

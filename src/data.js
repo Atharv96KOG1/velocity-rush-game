@@ -33,13 +33,13 @@ export const TRACKS = {
     points: [[-200, -200], [0, -220], [200, -200], [220, -50], [100, 0], [220, 60], [220, 200], [0, 220], [-100, 120], [-220, 200], [-240, 0]],
   },
   skyline: {
-    name: 'Skyline Gauntlet', theme: 'night', width: 13, hard: true,
-    desc: 'HARD · Narrow downtown streets, four hairpins and no room for error.',
+    name: 'Skyline Gauntlet', theme: 'night', width: 12, hard: true,
+    desc: 'HARD · Narrow downtown streets, four hairpins, roadblocks everywhere.',
     points: [[-250, -200], [-50, -230], [60, -160], [200, -220], [280, -120], [180, -60], [290, 20], [260, 160], [140, 120], [60, 220], [-80, 170], [-20, 60], [-160, 40], [-260, 120], [-300, -60]],
   },
   glacier: {
-    name: 'Glacier Run', theme: 'snow', width: 14, hard: true,
-    desc: 'HARD · Icy mountain pass: low grip, blind hairpins and falling snow.',
+    name: 'Glacier Run', theme: 'snow', width: 13, hard: true,
+    desc: 'HARD · Icy mountain pass: low grip, blind hairpins, rockfall barriers.',
     points: [[0, -260], [160, -240], [260, -150], [200, -60], [300, 40], [240, 180], [100, 140], [60, 260], [-100, 240], [-60, 120], [-200, 80], [-280, -40], [-160, -60], [-220, -180]],
   },
 };
