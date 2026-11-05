@@ -208,3 +208,6 @@ table.results tr.me { background: rgba(8,217,214,.12); font-weight: 700; }
 .it-name { font-size: 13px; letter-spacing: 1px; color: #cfd5ff; }
 .hud-item.ready .it-name { color: var(--it); }
 @media (max-width: 760px) { .hud-item { bottom: 150px; } .it-icon { width: 44px; height: 44px; font-size: 22px; } }
+
+.whatsnew { margin-top: 14px; display: inline-block; padding: 6px 12px; background: rgba(255,209,102,.12); border-left: 3px solid var(--gold); color: var(--gold); font-weight: 700; font-size: 15px; }
+.version { position: fixed; right: 14px; bottom: 10px; color: rgba(255,255,255,.35); font-size: 13px; letter-spacing: 1px; }

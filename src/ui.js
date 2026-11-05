@@ -75,6 +75,8 @@ export class UI {
     this.mount(`<div class="screen">${this.credits()}
       <div class="title">VELOCITY<br>RUSH</div>
       <div class="subtitle">Street · Circuit · Open World</div>
+      <div class="whatsnew">NEW · 🎁 Mystery-box weapons · 🤸 Jumps & flips (F) · 🚨 Police · 🏔️ Hard tracks</div>
+      <div class="version">v${document.querySelector('meta[name=version]')?.content ?? 'dev'}</div>
       <div class="menu">
         <button class="btn primary" data-go="showStory">Story Mode<small>${save.story >= STORY.length ? 'Completed — replay any chapter' : `Chapter ${chapter} of ${STORY.length}`}</small></button>
         <button class="btn" data-go="showQuick">Quick Race<small>1v1 · 2v2 · 3v3 · 6-car free-for-all vs AI</small></button>
