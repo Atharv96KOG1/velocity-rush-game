@@ -92,6 +92,11 @@ Story campaign · weapons & mystery boxes · jumps & flips · police chases · t
 
 **Play online:** https://atharv96kog1.github.io/velocity-rush-game/. Nothing to install. Internet multiplayer works there too.
 
+The current version is shown in the bottom-right corner of the main menu.
+
+> [!NOTE]
+> Mystery boxes, jumps and flips, police, ramps and takedowns are in **offline races**: Quick Race, Local Multiplayer, Story and Challenges. They aren't in Online Multiplayer or the Open World yet.
+
 **Run locally** (needed for local-network multiplayer). Requires Python 3 and a modern desktop browser (Chrome, Edge, Firefox or Safari).
 
 ```bash
@@ -277,6 +282,7 @@ velocity-rush/
 ├── index.html            Entry page and import map
 ├── style.css             Menus, HUD and overlays
 ├── serve.py              No-cache static server + LAN WebSocket relay
+├── stamp.py              Stamps a content-hash version on every module URL (run before each commit)
 ├── docs/screenshots/     README images
 └── src/
     ├── main.js           Bootstrap
