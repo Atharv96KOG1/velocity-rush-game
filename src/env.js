@@ -86,6 +86,8 @@ export function makeEnvMap(renderer, sky) {
   sc.add(sky.children[0].clone()); // gradient dome only: stars and clouds would speckle the paint
   const rt = pm.fromScene(sc, 0, 1, 3000);
   pm.dispose();
+  // Disposing only the texture leaves the render target on the GPU, so keep a handle to it.
+  rt.texture.userData.target = rt;
   return rt.texture;
 }
 

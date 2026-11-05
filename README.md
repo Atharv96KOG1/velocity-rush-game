@@ -3,7 +3,7 @@
 # 🏁 Velocity Rush
 
 **A fast 3D arcade racer that runs in your browser.**
-Story campaign · weapons & mystery boxes · jumps & flips · police chases · takedowns · online multiplayer · open world
+Story campaign · Meteor Storm · Mega Car · weapons & mystery boxes · jumps & flips · police chases · online multiplayer
 
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES2022-f7df1e?logo=javascript&logoColor=black)
 ![Three.js](https://img.shields.io/badge/Three.js-r169-000000?logo=threedotjs&logoColor=white)
@@ -42,7 +42,8 @@ Story campaign · weapons & mystery boxes · jumps & flips · police chases · t
 - **Eight modes.** Story campaign, quick race, knockout, challenges, open world, split-screen and online play.
 - **1v1, 2v2, 3v3 and 6-car free-for-all**, with team scoring and AI teammates or rivals.
 - **Jump and flip.** Press `F` to jump. In the air, flip, spin and barrel-roll with your own keys, and land wheels-down or crash.
-- **Mystery boxes and weapons.** Rows of glowing **?** boxes hand out homing missiles, mines, oil slicks, bubble shields and rocket boosts to fire at rivals.
+- **Mystery boxes and weapons.** Rows of glowing **?** boxes hand out homing missiles, mines, oil slicks, bubble shields, rocket boosts, and two wild ones: **🍄 Mega Car** (grow giant and flatten everyone) and **⚡ Lightning** (zap every rival ahead down to toy size).
+- **☄️ Meteor Storm.** Chaos mode rains flaming meteors onto the track; red circles show where they'll land.
 - **Takedowns.** Slam a rival into the wall and the game drops into a slow-motion crash cam while the wreck tumbles and scatters debris.
 - **Police in races.** Cop cars with glowing lightbars and sirens hunt you down. They ram you, block your lane, and BUST you if you get pinned.
 - **Ramps and stunts.** Every circuit has jumps. Hit them for BIG AIR, barrel rolls and flat spins.
@@ -187,6 +188,18 @@ Mix them for DOUBLE and TRIPLE combos; two or more in one jump shouts **INSANE!*
 | 🛢️ | Oil Slick | Dropped behind you; cars that hit it spin out and lose half their speed |
 | 🫧 | Bubble Shield | 6 seconds of protection; absorbs one missile, mine or oil slick |
 | 🔥 | Rocket Boost | 2.6-second surge, stronger than nitro |
+| 🍄 | Mega Car | 7 seconds at 2.3× size and faster. Every car you touch is flattened (MEGA CRUSH); you can't be hit by weapons |
+| ⚡ | Lightning | Bolts from the sky hit every rival ahead: they shrink to half size and slow down for 4.5 s, and full-size cars can squash them |
+
+Mega Car and Lightning mostly go to cars at the back of the pack.
+
+<img src="docs/screenshots/mega-car.jpg" alt="Mega Car crushing a rival" width="100%">
+
+**☄️ Meteor Storm (Chaos Mode).** Turn on **Chaos Mode** in Quick Race or the online lobby, or play the *Armageddon* challenge.
+- Every couple of seconds a pulsing **red circle** appears on the track ahead of the pack.
+- 2.2 seconds later a flaming meteor slams down. Any car inside the circle is wrecked, and the blast shakes the camera.
+- The circles show on the minimap. AI drivers try to swerve around them, and you can jump over a blast with `F`.
+- Online, the host decides where meteors fall, so everyone sees the same storm.
 
 Rivals pick up and fire items too. Watch for **MISSILE INCOMING!**
 

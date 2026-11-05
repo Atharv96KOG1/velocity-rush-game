@@ -56,6 +56,8 @@ export class Music {
   }
 
   schedule() {
+    // After a stall or a throttled background tab, skip missed notes instead of firing them all at once.
+    if (this.next < this.ctx.currentTime) this.next = this.ctx.currentTime + 0.02;
     while (this.next < this.ctx.currentTime + 0.12) {
       this.play(this.step, this.next);
       this.next += STEP;

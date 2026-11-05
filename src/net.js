@@ -82,7 +82,10 @@ class RelayHostPeer extends Emitter {
         if (c) { c.open = false; c.emit('close'); }
       }
     };
-    ws.onclose = () => { for (const c of this.conns.values()) { c.open = false; c.emit('close'); } };
+    ws.onclose = () => {
+      for (const c of this.conns.values()) { c.open = false; c.emit('close'); }
+      if (!this.destroyed) this.emit('closed');
+    };
   }
   out(m) { if (this.ws.readyState === 1) this.ws.send(JSON.stringify(m)); }
   reconnect() {}
@@ -145,7 +148,7 @@ class CloudHostPeer extends Emitter {
 }
 
 // Messages relayed by the host to every other client.
-const RELAY = new Set(['s', 'pw', 'wk', 'sw', 'box', 'use', 'hz', 'mh']);
+const RELAY = new Set(['s', 'pw', 'wk', 'sw', 'box', 'use', 'hz', 'mh', 'mt', 'bust', 'ob']);
 
 export class NetHost extends Emitter {
   /** Internet room: listens for direct (WebRTC) and cloud-relay joins under the same code. */
@@ -219,6 +222,8 @@ export class NetHost extends Emitter {
     this.peers.push(peer);
     peer.on('connection', conn => this.accept(conn));
     peer.on('disconnected', () => { if (!peer.destroyed) peer.reconnect?.(); });
+    // The LAN relay going away means the room is gone.
+    peer.on('closed', () => this.emit('closed'));
   }
 
   accept(conn) {

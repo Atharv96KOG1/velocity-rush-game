@@ -70,6 +70,7 @@ export const CHALLENGES = [
   { id: 'c8', title: 'Wrecking Crew', desc: 'Win a knockout at Red Canyon with police on the track.', track: 'canyon', type: 'knockout', format: 'ffa', laps: 6, difficulty: 1.0, police: true, goal: { type: 'survive' }, reward: 1500 },
   { id: 'c9', title: 'Gauntlet', desc: 'Win a 6-car race on Skyline Gauntlet.', track: 'skyline', type: 'race', format: 'ffa', laps: 2, difficulty: 1.0, goal: { type: 'position', value: 1 }, reward: 1600 },
   { id: 'c10', title: 'Ice Drift', desc: 'Score 5,000 drift points on Glacier Run.', track: 'glacier', type: 'drift', laps: 1, goal: { type: 'drift', value: 5000 }, reward: 1200 },
+  { id: 'c11', title: 'Armageddon', desc: 'Win a race through a meteor storm with police on your tail.', track: 'canyon', type: 'race', format: 'ffa', laps: 2, difficulty: 1.0, police: true, chaos: true, goal: { type: 'position', value: 1 }, reward: 2000 },
   { id: 'c6', title: 'Pro Duel', desc: 'Beat a hard rival over 3 laps at the harbor.', track: 'harbor', type: 'race', format: '1v1', laps: 3, difficulty: 1.1, goal: { type: 'position', value: 1 }, reward: 1000 },
 ];
 

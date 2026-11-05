@@ -24,8 +24,9 @@ export class ChaseCam {
       cam.position.set(c.pos.x + fx * 0.3, c.pos.y + 1.25, c.pos.z + fz * 0.3);
       this.look.set(c.pos.x + fx * 30, c.pos.y + 1.0, c.pos.z + fz * 30);
     } else {
-      const dist = this.mode === 0 ? 6.8 + sp * 1.6 : 10.5 + sp * 2.5;
-      const h = this.mode === 0 ? 2.5 : 3.8;
+      const big = c.mesh?.scale.x > 1.05 ? c.mesh.scale.x : 1;
+      const dist = (this.mode === 0 ? 6.8 + sp * 1.6 : 10.5 + sp * 2.5) * big;
+      const h = (this.mode === 0 ? 2.5 : 3.8) * big;
       // Smooth the heading (so drifts swing the view) but stay locked to the car's position.
       if (!this.ready) { this.yaw = c.yaw; this.h = c.pos.y + h; this.ready = true; }
       let dy = c.yaw - this.yaw;
@@ -57,20 +58,21 @@ export class ChaseCam {
 
 /** Each car is two circles (nose and tail). Equal-mass impulse with a little bounce. */
 export function collideCars(cars, onHit = null) {
-  const R = 2.3, off = 1.1;
+  const size = c => c.mesh?.scale.x ?? 1;   // mega cars are bigger, zapped cars smaller
   for (let a = 0; a < cars.length; a++) {
     for (let b = a + 1; b < cars.length; b++) {
       const A = cars[a], B = cars[b];
       if (A.ghost > 0 || B.ghost > 0) continue;
       // A shielded car acts as immovable; the other takes the whole hit.
-      let wa = A.shield > 0 ? 0 : 1, wb = B.shield > 0 ? 0 : 1;
+      let wa = A.shield > 0 || A.mega > 0 ? 0 : 1, wb = B.shield > 0 || B.mega > 0 ? 0 : 1;
       if (!wa && !wb) wa = wb = 1;
       const sum = wa + wb;
-      const dx0 = B.pos.x - A.pos.x, dz0 = B.pos.z - A.pos.z;
-      if (dx0 * dx0 + dz0 * dz0 > 36) continue;
+      const sA = size(A), sB = size(B), R = 1.15 * (sA + sB), offA = 1.1 * sA, offB = 1.1 * sB;
+      const dx0 = B.pos.x - A.pos.x, dz0 = B.pos.z - A.pos.z, reach = 3 * (sA + sB);
+      if (dx0 * dx0 + dz0 * dz0 > reach * reach) continue;
       for (const sa of [-1, 1]) for (const sb of [-1, 1]) {
-        const ax = A.pos.x + Math.sin(A.yaw) * off * sa, az = A.pos.z + Math.cos(A.yaw) * off * sa;
-        const bx = B.pos.x + Math.sin(B.yaw) * off * sb, bz = B.pos.z + Math.cos(B.yaw) * off * sb;
+        const ax = A.pos.x + Math.sin(A.yaw) * offA * sa, az = A.pos.z + Math.cos(A.yaw) * offA * sa;
+        const bx = B.pos.x + Math.sin(B.yaw) * offB * sb, bz = B.pos.z + Math.cos(B.yaw) * offB * sb;
         const dx = bx - ax, dz = bz - az, d2 = dx * dx + dz * dz;
         if (d2 >= R * R || d2 < 1e-6) continue;
         const d = Math.sqrt(d2), nx = dx / d, nz = dz / d, pen = R - d;
@@ -81,7 +83,7 @@ export function collideCars(cars, onHit = null) {
           const j = -((wa && wb ? 1.3 : 2.2) * rv) / sum;
           A.vx -= nx * j * wa; A.vz -= nz * j * wa;
           B.vx += nx * j * wb; B.vz += nz * j * wb;
-          if (-rv > 4 && onHit) onHit(A, B, (ax + bx) / 2, (A.pos.y + B.pos.y) / 2 + 0.6, (az + bz) / 2, -rv);
+          if ((-rv > 4 || A.mega > 0 || B.mega > 0 || A.tiny > 0 || B.tiny > 0) && onHit) onHit(A, B, (ax + bx) / 2, (A.pos.y + B.pos.y) / 2 + 0.6, (az + bz) / 2, -rv);
         }
       }
     }
@@ -154,4 +156,19 @@ export function hideNearCameras(cars, cameras, radius = 3.4) {
     }
     c.mesh.visible = !near;
   }
+}
+
+/** Frees everything a session scene put on the GPU: geometry, materials, textures and shadow maps. */
+export function disposeScene(scene) {
+  scene.environment?.userData.target?.dispose();
+  scene.environment?.dispose();
+  scene.traverse(o => {
+    o.geometry?.dispose();
+    const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+    for (const m of mats) {
+      for (const key of ['map', 'emissiveMap', 'normalMap', 'roughnessMap', 'alphaMap']) m[key]?.dispose();
+      m.dispose();
+    }
+    if (o.isLight) { o.shadow?.map?.dispose(); o.dispose?.(); }
+  });
 }

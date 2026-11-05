@@ -49,7 +49,7 @@ export class Game {
 
     music.muted = save.music === false;
     addEventListener('keydown', e => {
-      if (e.code === 'KeyM' && !e.repeat && e.target === document.body) {
+      if (e.code === 'KeyM' && !e.repeat && !(e.target instanceof HTMLInputElement)) {
         save.music = music.muted;
         persist();
         music.setMuted(!music.muted);

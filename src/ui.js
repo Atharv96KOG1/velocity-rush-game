@@ -51,18 +51,23 @@ export class UI {
 
   flashNote(text) { toast('AUDIO', text); }
 
-  mount(html) {
+  /** focus: false for overlays shown mid-race, where a held driving key (Space, Enter) would press the button. */
+  mount(html, { focus = true } = {}) {
     this.root.innerHTML = '';
     const node = el(html);
     this.root.appendChild(node);
     node.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => this[b.dataset.go](); });
-    node.querySelector('button:not([disabled])')?.focus({ preventScroll: true });
+    if (focus) node.querySelector('button:not([disabled])')?.focus({ preventScroll: true });
+    else document.activeElement?.blur?.();
     return node;
   }
+
+  mountOverlay(html) { return this.mount(html, { focus: false }); }
 
   credits() { return `<div class="credits">◆ ${save.credits.toLocaleString()} CR</div>`; }
 
   toMenu() {
+    this.pauseOpen = false;
     if (this.game.session !== this.game.menu) this.game.backToMenu();
     this.game.menu.showCar(save.car, paintOf(save.car));
   }
@@ -75,7 +80,7 @@ export class UI {
     this.mount(`<div class="screen">${this.credits()}
       <div class="title">VELOCITY<br>RUSH</div>
       <div class="subtitle">Street · Circuit · Open World</div>
-      <div class="whatsnew">NEW · 🎁 Mystery-box weapons · 🤸 Jumps & flips (F) · 🚨 Police · 🏔️ Hard tracks</div>
+      <div class="whatsnew">NEW · ☄️ Meteor Storm · 🍄 Mega Car · ⚡ Lightning · 🎁 Weapons · 🤸 Flips (F) · 🚨 Police</div>
       <div class="version">v${document.querySelector('meta[name=version]')?.content ?? 'dev'}</div>
       <div class="menu">
         <button class="btn primary" data-go="showStory">Story Mode<small>${save.story >= STORY.length ? 'Completed — replay any chapter' : `Chapter ${chapter} of ${STORY.length}`}</small></button>
@@ -98,7 +103,7 @@ export class UI {
 
   showSetup(humans) {
     this.toMenu();
-    const st = this.setupState ??= { track: 'harbor', format: '1v1', laps: 3, diff: 'normal', coop: false, mode: 'race', p2car: save.owned[0], powers: 'on', p2power: save.powers[0], weather: 'clear', police: 'off', items: 'on' };
+    const st = this.setupState ??= { track: 'harbor', format: '1v1', laps: 3, diff: 'normal', coop: false, mode: 'race', p2car: save.owned[0], powers: 'on', p2power: save.powers[0], weather: 'clear', police: 'off', items: 'on', chaos: 'off' };
     if (!save.owned.includes(st.p2car)) st.p2car = save.owned[0];
     if (!save.powers.includes(st.p2power)) st.p2power = save.powers[0];
     if (humans === 1 || st.format === '1v1') st.coop = false;
@@ -130,6 +135,8 @@ export class UI {
       <div class="chips">${chips('items', ['on', 'off'], v => v === 'on' ? '🎁 ON' : 'OFF')}</div>
       <div class="label">Police</div>
       <div class="chips">${chips('police', ['off', 'on'], v => v === 'on' ? '🚨 COPS CHASE YOU' : 'NO POLICE')}</div>
+      <div class="label">Chaos Mode</div>
+      <div class="chips">${chips('chaos', ['off', 'on'], v => v === 'on' ? '☄️ METEOR STORM' : 'OFF')}</div>
       ${humans === 2 && st.powers === 'on' ? `<div class="label">P2 Power</div><div class="chips">${save.powers.map(id => `<button class="chip ${st.p2power === id ? 'on' : ''}" data-k="p2power" data-v="${id}">${powerById(id).icon} ${powerById(id).name}</button>`).join('')}</div>` : ''}
       ${st.mode === 'race' ? `<div class="label">Laps</div><div class="chips">${chips('laps', [1, 2, 3, 5])}</div>` : ''}
       <div class="label">AI Difficulty</div>
@@ -155,7 +162,7 @@ export class UI {
         title: humans === 2 ? 'Local Multiplayer' : 'Quick Race',
         type: st.mode, track: st.track, format: st.format,
         laps: st.mode === 'knockout' ? 6 : st.laps,
-        difficulty: DIFFICULTY[st.diff], humans: players, coop: st.coop, powers: st.powers === 'on', weather: st.weather, police: st.police === 'on', items: (st.items ?? 'on') === 'on',
+        difficulty: DIFFICULTY[st.diff], humans: players, coop: st.coop, powers: st.powers === 'on', weather: st.weather, police: st.police === 'on', items: (st.items ?? 'on') === 'on', chaos: st.chaos === 'on',
       });
     };
   }
@@ -193,14 +200,17 @@ export class UI {
     const status = node.querySelector('[data-status]');
     const nameIn = node.querySelector('[data-name]'), codeIn = node.querySelector('[data-code]');
     const saveName = () => { save.name = nameIn.value.replace(/[^\w \-]/g, '').trim().slice(0, 12) || 'Racer'; persist(); };
-    const busy = (msg) => { status.className = 'net-status'; status.textContent = msg; node.querySelectorAll('button').forEach(b => { b.disabled = true; }); };
-    const fail = e => this.showOnline(e.message ?? String(e));
+    // One connection attempt at a time: a double Enter or click would open two rooms/joins.
+    const busy = (msg) => { this.connecting = true; status.className = 'net-status'; status.textContent = msg; node.querySelectorAll('button, input').forEach(b => { b.disabled = true; }); };
+    const fail = e => { this.connecting = false; this.showOnline(e.message ?? String(e)); };
     node.querySelectorAll('[data-host]').forEach(b => b.onclick = async () => {
+      if (this.connecting) return;
       saveName();
       busy('Creating room…');
       try { this.attachNet(await (b.dataset.host === 'lan' ? NetHost.createRelay(this.me()) : NetHost.create(this.me()))); } catch (e) { fail(e); }
     });
     const join = async () => {
+      if (this.connecting) return;
       saveName();
       const code = codeIn.value.trim().toUpperCase();
       if (code.length !== 5) { status.className = 'net-status err'; status.textContent = 'Enter the 5-character room code.'; return; }
@@ -212,9 +222,11 @@ export class UI {
   }
 
   attachNet(net) {
+    this.connecting = false;
+    if (this.net) this.leaveNet();
     this.net = net;
     if (net.role === 'host') {
-      net.setSettings(this.netSettings ??= { track: 'harbor', mode: 'race', format: 'ffa', laps: 3, diff: 'normal', powers: true, fill: true, weather: 'clear', items: true, police: false });
+      net.setSettings(this.netSettings ??= { track: 'harbor', mode: 'race', format: 'ffa', laps: 3, diff: 'normal', powers: true, fill: true, weather: 'clear', items: true, police: false, chaos: false });
     }
     this.netOff = [
       net.on('lobby', () => { if (this.inLobby) this.showLobby(); }),
@@ -245,6 +257,12 @@ export class UI {
     const host = net.role === 'host';
     const st = net.settings ?? {};
     const players = net.players;
+    // More players than a team format holds: switch to free-for-all instead of dropping someone.
+    if (host && TEAM_SIZE[st.format] && players.length > TEAM_SIZE[st.format] * 2) {
+      this.netSettings = { ...st, format: 'ffa' };
+      net.setSettings(this.netSettings);
+      return;
+    }
     const slots = this.slotsFor(st, players.length);
     const chips = (key, opts, fmt = v => v, disabled = () => false) => opts.map(v =>
       `<button class="chip ${st[key] === v ? 'on' : ''}" data-k="${key}" data-v="${v}" ${!host || disabled(v) ? 'disabled' : ''}>${fmt(v)}</button>`).join('');
@@ -275,9 +293,11 @@ export class UI {
       <div class="chips">${chips('items', [true, false], v => v ? '🎁 ON' : 'OFF')}</div>
       <div class="label">Police</div>
       <div class="chips">${chips('police', [false, true], v => v ? '🚨 COPS ON' : 'NO POLICE')}</div>
+      <div class="label">Chaos Mode</div>
+      <div class="chips">${chips('chaos', [false, true], v => v ? '☄️ METEOR STORM' : 'OFF')}</div>
       <div class="desc" style="margin-top:14px">${slots.total} cars on the grid${slots.ai ? ` (${slots.ai} AI)` : ''}.</div>
       <div class="row">
-        ${host ? `<button class="btn primary inline" data-start ${slots.total < 2 ? 'disabled' : ''}>Start Race</button>` : ''}
+        ${host ? `<button class="btn primary inline" data-start ${slots.total < 2 || slots.ai < 0 ? 'disabled' : ''}>Start Race</button>` : ''}
         <button class="btn inline" data-leave>Leave Room</button>
       </div></div>`);
     node.querySelector('[data-copy]').onclick = () => navigator.clipboard?.writeText(net.code);
@@ -335,7 +355,7 @@ export class UI {
     this.startRace({
       title: 'Online Race', type: st.mode, track: st.track, format: st.format,
       laps: st.mode === 'knockout' ? 6 : st.laps, difficulty: DIFFICULTY[st.diff], powers: st.powers, weather: st.weather ?? 'clear',
-      items: st.items ?? true, police: !!st.police,
+      items: st.items ?? true, police: !!st.police, chaos: !!st.chaos,
       humans: [this.me()], entries: msg.entries, net: this.net,
     });
   }
@@ -373,7 +393,7 @@ export class UI {
   eventCfg(s, extra) {
     return {
       type: s.type, track: s.track, format: s.format ?? 'ffa', laps: s.laps, difficulty: s.difficulty ?? 1,
-      goal: s.goal, reward: s.reward, rival: s.rival, weather: s.weather ?? 'clear', police: !!s.police,
+      goal: s.goal, reward: s.reward, rival: s.rival, weather: s.weather ?? 'clear', police: !!s.police, chaos: !!s.chaos,
       humans: [{ car: save.car, name: 'YOU', power: save.power, color: paintOf(save.car), tune: tuneOf(save.car) }],
       powers: s.type === 'race' || s.type === 'knockout', ...extra,
     };
@@ -433,6 +453,7 @@ export class UI {
         ? [{ car: save.car, name: 'P1', power: save.power, color: paintOf(save.car), tune: tuneOf(save.car) }, { car: p2car, name: 'P2', power: p2power, color: paintOf(p2car), tune: tuneOf(p2car) }]
         : [{ car: save.car, name: 'YOU', power: save.power, color: paintOf(save.car), tune: tuneOf(save.car) }];
       this.root.innerHTML = '';
+      this.pauseOpen = false;
       this.game.setSession(new WorldSession(this.game, { humans, world: true }));
     });
   }
@@ -534,7 +555,7 @@ export class UI {
     if (this.photoMode || !s.humans || s.cfg?.net || s.over) return;
     const pm = this.photoMode = new PhotoMode(this.game, () => { this.photoMode = null; this.root.innerHTML = ''; });
     const render = () => {
-      const node = this.mount(`<div class="photo-bar">
+      const node = this.mountOverlay(`<div class="photo-bar">
         <span class="tag">📷 PHOTO MODE</span><span class="photo-hint">Drag to orbit · scroll to zoom</span>
         ${pm.looks.map((l, i) => `<button class="chip ${pm.look === i ? 'on' : ''}" data-look="${i}">${l}</button>`).join('')}
         <button class="btn primary inline" data-save>Save Photo</button>
@@ -600,7 +621,7 @@ export class UI {
     if (this.pauseOpen) { g.paused = false; this.pauseOpen = false; this.root.innerHTML = ''; return; }
     this.pauseOpen = true;
     g.paused = !s.cfg?.net; // an online race keeps running for everyone else
-    const node = this.mount(`<div class="overlay"><div class="modal">
+    const node = this.mountOverlay(`<div class="overlay"><div class="modal">
       <div class="h2">PAUSED</div>
       <div class="menu" style="width:100%">
         <button class="btn primary" data-a="resume">Resume</button>
@@ -618,6 +639,10 @@ export class UI {
   }
 
   showResults(res, cfg) {
+    this.pauseOpen = false;
+    // Challenge and daily rewards pay out once; replays still earn style credits.
+    const repeat = (cfg.challengeId && save.challenges[cfg.challengeId]?.done) || (cfg.dailyDay && save.daily === cfg.dailyDay);
+    if (repeat && res.success && cfg.reward) res.credits = Math.max(0, res.credits - cfg.reward);
     // Rewards and progression.
     let unlocked = '';
     save.credits += res.credits;
@@ -643,7 +668,7 @@ export class UI {
     const next = cfg.storyIndex != null && res.success && cfg.storyIndex + 1 < STORY.length;
     const online = !!cfg.net;
 
-    const node = this.mount(`<div class="overlay"><div class="modal">
+    const node = this.mountOverlay(`<div class="overlay"><div class="modal">
       <div class="tag">${esc(cfg.title ?? 'Race')} · ${res.track}</div>
       <div class="result-head ${res.success ? 'win' : 'lose'}" style="margin-top:8px">${res.head}</div>
       ${res.goalText ? `<div class="goal">🎯 ${res.goalText}</div>` : ''}

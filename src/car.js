@@ -159,6 +159,8 @@ export class Car {
     this.vy = 0;          // vertical speed while airborne
     this.air = false;
     this.wreck = 0;       // seconds until a wrecked car respawns
+    this.mega = 0;        // seconds of Mega Car (giant, crushes cars)
+    this.tiny = 0;        // seconds shrunk by Lightning
     this.gripMul = 1;     // weather: wet roads lower grip
   }
 
@@ -191,7 +193,7 @@ export class Car {
     this.nitroOn = c.nitro && this.boost > 0.01 && c.throttle > 0 && fwd > 3;
     if (this.nitroOn) this.boost = Math.max(0, this.boost - dt * 0.3 / (1 + ((s.nitroMul ?? 1) - 1) * 0.5));
     this.padBoost = Math.max(0, this.padBoost - dt);
-    const maxV = s.maxSpeed * (0.4 + 0.6 * sf) + (this.nitroOn ? 16 : 0) + (this.turbo > 0 ? 25 : 0) + (this.draft ? 6 : 0) + (this.padBoost > 0 ? 20 : 0) + (this.shockNitro > 0 ? 28 : 0) - (this.stun > 0 ? s.maxSpeed * 0.5 : 0);
+    const maxV = s.maxSpeed * (0.4 + 0.6 * sf) + (this.nitroOn ? 16 : 0) + (this.turbo > 0 ? 25 : 0) + (this.draft ? 6 : 0) + (this.padBoost > 0 ? 20 : 0) + (this.shockNitro > 0 ? 28 : 0) + (this.mega > 0 ? 10 : 0) - (this.tiny > 0 ? s.maxSpeed * 0.3 : 0) - (this.stun > 0 ? s.maxSpeed * 0.5 : 0);
 
     if (c.throttle > 0 && fwd < maxV) {
       const r = Math.max(0, fwd) / maxV;
@@ -208,7 +210,7 @@ export class Car {
     if (!c.throttle && !c.brake) fwd -= Math.sign(fwd) * Math.min(Math.abs(fwd), 2.5 * dt);
     if (c.hand) fwd -= Math.sign(fwd) * Math.min(Math.abs(fwd), 5 * dt);
 
-    const grip = s.grip * this.gripMul * (c.hand ? 0.3 : 1) * (0.55 + 0.45 * sf);
+    const grip = s.grip * this.gripMul * (c.hand ? 0.3 : 1) * (0.55 + 0.45 * sf) * (this.spinOut > 0 ? 0.3 : 1);
     lat *= Math.exp(-grip * dt);
     // Cap the slip angle so drifts stay controllable instead of spinning out.
     if (fwd > 5) {

@@ -5,7 +5,7 @@ export const REWINDS = 3; // uses per race
 const FIELDS = ['yaw', 'vx', 'vz', 'fwdSpeed', 'latSpeed', 'steerVis', 'lap', 'trackIndex', 'progress', 'boost',
   'finished', 'finishTime', 'driftScore', 'lapStart', 'bestLap', 'turbo', 'shield', 'ghost', 'stun', 'padBoost', 'stuck',
   'shockNitro', 'air', 'vy', 'airT', 'roll', 'pitch', 'visYaw', 'wreck', 'busted', 'bust',
-  'manual', 'flipA', 'spinA', 'rollA', 'item', 'spinOut'];
+  'manual', 'flipA', 'spinA', 'rollA', 'spinOut', 'mega', 'tiny'];
 
 /** Ring buffer of race snapshots; holding the rewind key plays them back in reverse. */
 export class Rewind {
@@ -24,6 +24,7 @@ export class Rewind {
     const s = this.s;
     this.buf.push({
       time: s.time,
+      dnf: s.dnf,
       cars: s.cars.map(c => {
         const o = { x: c.pos.x, y: c.pos.y, z: c.pos.z, charge: c.power?.charge ?? 0 };
         for (const f of FIELDS) o[f] = c[f];
@@ -34,17 +35,24 @@ export class Rewind {
   }
 
   /** Called every frame. Returns true while rewinding. */
-  step(held) {
-    if (!held) { this.active = false; return false; }
+  step(held, dt = 1 / 60) {
+    if (!held) { this.active = false; this.needRelease = false; return false; }
     if (!this.active) {
-      if (this.left <= 0 || this.buf.length < 5) return false;
+      // A new rewind needs a fresh press, so holding Q past an empty buffer doesn't burn charges.
+      if (this.needRelease || this.left <= 0 || this.buf.length < 5) return false;
       this.left--;
       this.active = true;
+      this.acc = 0;
     }
-    const snap = this.buf.pop();
-    if (!snap) { this.active = false; return false; }
+    // Play back at 2x real time regardless of frame rate.
+    this.acc += dt * RATE * 2;
+    let snap = null;
+    while (this.acc >= 1 && this.buf.length) { snap = this.buf.pop(); this.acc -= 1; }
+    if (!snap && !this.buf.length) { this.active = false; this.needRelease = true; return false; }
+    if (!snap) return true;
     const s = this.s;
     s.time = snap.time;
+    s.dnf = snap.dnf;
     snap.cars.forEach((o, i) => {
       const c = s.cars[i];
       c.pos.set(o.x, o.y, o.z);

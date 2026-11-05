@@ -147,6 +147,9 @@ export class Trail {
     });
   }
 
+  /** Forget the trail, e.g. after a respawn or teleport, so it doesn't streak across the map. */
+  reset() { this.pts.length = 0; this.mat.uniforms.strength.value = 0; }
+
   update(car, strength) {
     this.mat.uniforms.strength.value += (strength - this.mat.uniforms.strength.value) * 0.15;
     const fx = Math.sin(car.yaw), fz = Math.cos(car.yaw);

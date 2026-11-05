@@ -5,7 +5,7 @@ import { Car } from './car.js';
 import { AIDriver } from './ai.js';
 import { readControls, IDLE } from './input.js';
 import { canvasTex, makeEnvMap, makeSky, makeLights, buildCircuitScenery, makeLabel, groundMesh } from './env.js';
-import { ChaseCam, collideCars, Smoke, hideNearCameras } from './common.js';
+import { ChaseCam, collideCars, Smoke, hideNearCameras, disposeScene } from './common.js';
 import { HUD, Minimap } from './hud.js';
 import { EngineSound, beep } from './audio.js';
 import { Sparks, Rings, Trail } from './fx.js';
@@ -17,6 +17,7 @@ import { unlock, count } from './achieve.js';
 import { Rewind, REWINDS } from './rewind.js';
 import { Action } from './action.js';
 import { Items } from './items.js';
+import { MeteorStorm } from './chaos.js';
 
 const TEAM_COLORS = { A: [0x3a86ff, 0x4cc9f0, 0x4361ee], B: [0xff006e, 0xf72585, 0xff5d8f] };
 const FFA_COLORS = [0xffbe0b, 0x8338ec, 0x06d6a0, 0xfb5607, 0xe5e5e5, 0x118ab2];
@@ -24,7 +25,7 @@ export const TEAM_SIZE = { '1v1': 1, '2v2': 2, '3v3': 3 };
 export { TEAM_COLORS, FFA_COLORS };
 const NET_RATE = 1 / 20;
 // State flag bits sent over the network.
-const F = { nitro: 1, turbo: 2, shield: 4, ghost: 8, stun: 16, brake: 32, drift: 64, shock: 128, pad: 256 };
+const F = { nitro: 1, turbo: 2, shield: 4, ghost: 8, stun: 16, brake: 32, drift: 64, shock: 128, pad: 256, mega: 512, tiny: 1024 };
 
 export const fmtTime = t => {
   if (t == null || !isFinite(t)) return '—';
@@ -128,6 +129,7 @@ export class RaceSession {
         : 'W/↑ gas · S/↓ brake · A D steer · SPACE drift · SHIFT nitro (2× shockwave) · F jump (air: W/S flip, A/D spin, SPACE+A/D roll) · X item · E power · Q rewind · ESC pause',
     });
 
+    this.rank();
     this.style = new StyleTracker(this.hud, this.humans, {
       overtakes: !this.solo,
       onEvent: (h, label, st) => {
@@ -144,6 +146,8 @@ export class RaceSession {
     this.action = new Action(this);
     // Mystery boxes and weapons, on by default in offline races.
     if (this.action && !this.solo && (cfg.items ?? true)) this.items = new Items(this, this.action);
+    // Chaos mode: meteors rain onto the track.
+    if (cfg.chaos && !this.solo) this.meteors = new MeteorStorm(this, this.action);
 
     // Rewind: offline only (online races can't roll back other players), not in knockout.
     if (!this.net && cfg.type !== 'knockout') this.rewind = new Rewind(this);
@@ -287,6 +291,8 @@ export class RaceSession {
     if (c.drifting) f |= F.drift;
     if (c.shockNitro > 0) f |= F.shock;
     if (c.padBoost > 0) f |= F.pad;
+    if (c.mega > 0) f |= F.mega;
+    if (c.tiny > 0) f |= F.tiny;
     const r = v => Math.round(v * 100) / 100;
     return [c.id, r(c.pos.x), r(c.pos.z), r(c.yaw), r(c.vx), r(c.vz), r(c.fwdSpeed), r(c.latSpeed), r(c.steerVis),
       c.lap, c.trackIndex, r(c.boost), f, c.finished ? r(c.finishTime) : -1, Math.round(c.driftScore), c.bestLap == null ? -1 : r(c.bestLap),
@@ -303,6 +309,7 @@ export class RaceSession {
           car.net = { x, z, yaw, vx, vz, y, at: performance.now() / 1000 };
           car.pitch = pitch; car.roll = roll; car.visYaw = visYaw;
           car.shockNitro = f & F.shock ? 0.3 : 0; car.padBoost = f & F.pad ? 0.3 : 0;
+          car.mega = f & F.mega ? 0.3 : 0; car.tiny = f & F.tiny ? 0.3 : 0;
           car.fwdSpeed = fwd; car.latSpeed = lat; car.steerVis = steer; car.boost = boost;
           car.nitroOn = !!(f & F.nitro); car.braking = !!(f & F.brake); car.drifting = !!(f & F.drift);
           car.turbo = f & F.turbo ? 0.3 : 0; car.shield = f & F.shield ? 0.3 : 0;
@@ -313,9 +320,10 @@ export class RaceSession {
           if (fin >= 0 && !car.finished) { car.finished = true; car.finishTime = fin; }
         }
         break;
-      case 'wk': case 'sw': case 'box': case 'use': case 'hz': case 'mh':
+      case 'wk': case 'sw': case 'box': case 'use': case 'hz': case 'mh': case 'mt': case 'bust': case 'ob':
         this.action?.onNet(m);
         this.items?.onNet(m);
+        this.meteors?.onNet(m);
         break;
       case 'pw': {
         const car = this.byId.get(m.id);
@@ -345,11 +353,13 @@ export class RaceSession {
   }
 
   hostLost() {
-    if (this.over) return;
+    if (this.over || this.disposed) return;
+    const net = this.net;
     this.over = true;
     this.state = 'done';
     this.hud.center('HOST LEFT', 4);
-    setTimeout(() => this.game.ui.netLost('The host closed the room.'), 2500);
+    // Only act if this race and this connection are still current (the player may have moved on).
+    setTimeout(() => { if (this.game.ui.net === net && this.game.session === this) this.game.ui.netLost('The host closed the room.'); }, 2500);
   }
 
   // Remote cars glide toward their last known state, extrapolated by velocity.
@@ -439,6 +449,7 @@ export class RaceSession {
     }
     this.action?.update(dt, counting);
     this.items?.update(dt);
+    this.meteors?.update(dt);
     this.powers?.update(dt);
     const solid = [...this.cars, ...(this.action?.cops ?? [])].filter(c => !c.eliminated && !(c.wreck > 0) && !c.air);
     collideCars(solid, (a, b, x, y, z, v) => {
@@ -524,6 +535,7 @@ export class RaceSession {
     const t = this.track, i = t.wrap(car.trackIndex);
     car.place(t.px[i], t.pz[i], Math.atan2(t.tx[i], t.tz[i]));
     car.stuck = 0;
+    car.trail?.reset();
     car.air = false;
     car.vy = 0;
     car.roll = car.pitch = car.visYaw = 0;
@@ -709,6 +721,7 @@ export class RaceSession {
     this.t = (this.t ?? 0) + dt;
     this.powers?.frame(dt, this.t);
     for (const car of this.cars) {
+      if (car.wreck > 0) car.trail.mat.uniforms.strength.value *= 0.85;
       if (car.eliminated || car.wreck > 0) continue;
       const fast = car.nitroOn || car.turbo > 0 ? 1 : Math.max(0, (car.fwdSpeed - 30) / 30);
       car.trail.update(car, Math.min(1, fast * (this.theme.night ? 1 : 0.6)));
@@ -719,7 +732,7 @@ export class RaceSession {
     if (this.rewind) {
       const held = this.state === 'race' && readControls(0, this.humans.length === 1).rewind;
       const was = this.rewind.active;
-      if (this.rewind.step(held)) {
+      if (this.rewind.step(held, dt)) {
         for (const car of this.cars) car.syncMesh();
         if (!was) { this.hud.msg(`◀◀ REWIND · ${this.rewind.left} LEFT`, 1.5, null, '#a0c4ff'); beep(300, 0.3, 'sine', 0.2); }
       } else if (held && !was && this.rewind.left === 0) this.hud.msg('NO REWINDS LEFT', 1);
@@ -751,6 +764,7 @@ export class RaceSession {
     });
     this.action?.frame(dt);
     this.items?.frame(dt);
+    this.meteors?.frame(dt);
     hideNearCameras([...this.cars, ...(this.action?.cops ?? [])], this.humans.map(h => h.cam.camera));
     this.action?.blinkCars(dt);
     this.lights.follow(this.humans[0].pos);
@@ -766,6 +780,7 @@ export class RaceSession {
     this.minimap.draw([
       ...this.cars.filter(c => !c.eliminated && !c.isHuman).map(c => ({ x: c.pos.x, z: c.pos.z, r: c.netPlayer ? 5 : 3.5, color: c.netPlayer && !c.team ? '#ffd166' : c.team === 'A' ? '#6fb1ff' : c.team === 'B' ? '#ff6fa8' : '#' + new THREE.Color(c.color).getHexString() })),
       ...(this.action?.markers() ?? []),
+      ...(this.meteors?.markers() ?? []),
       ...this.humans.map((c, i) => ({ x: c.pos.x, z: c.pos.z, yaw: c.yaw, r: 7, color: i ? '#ffd166' : '#08d9d6' })),
     ]);
   }
@@ -809,6 +824,7 @@ export class RaceSession {
   }
 
   dispose() {
+    this.disposed = true;
     this.items?.dispose();
     this.action?.dispose();
     this.scene.environment?.dispose();
@@ -816,11 +832,7 @@ export class RaceSession {
     for (const h of this.humans) h.engine.stop();
     this.hud.dispose();
     this.smoke.dispose();
-    this.scene.traverse(o => {
-      o.geometry?.dispose();
-      const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
-      for (const m of mats) { m.map?.dispose(); m.dispose(); }
-    });
+    disposeScene(this.scene);
   }
 }
 

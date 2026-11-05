@@ -251,8 +251,8 @@ export class Action {
     if (s.state !== 'race' || s.time < 2 || cop.hold > 0) return { throttle: 0, brake: 1, steer: 0, hand: false, nitro: false };
     // Chase the nearest human by track progress.
     let target = null, best = Infinity;
-    for (const h of s.humans) {
-      if (h.finished || h.eliminated || h.wreck > 0) continue;
+    for (const h of s.players ?? s.humans) {
+      if (h.finished || h.eliminated || h.left || h.wreck > 0) continue;
       const gap = h.progress - cop.progress;
       if (Math.abs(gap) < Math.abs(best)) { best = gap; target = h; }
     }
@@ -264,6 +264,7 @@ export class Action {
       cop.ai.lane = Math.max(-s.track.width * 0.35, Math.min(s.track.width * 0.35, s.track.lat));
       cop.ai.laneTimer = 1;
     } else cop.ai.skill = metres > 150 ? 1.3 : metres > 40 ? 1.18 : 1.08;
+    cop.target = target;
     const c = cop.ai.control(dt, s.cars);
     if (!target) return c;
     const dx = target.pos.x - cop.pos.x, dz = target.pos.z - cop.pos.z, d = Math.hypot(dx, dz);
@@ -468,6 +469,9 @@ export class Action {
     const s = this.s, now = s.time;
     a.lastHit = { by: b, t: now };
     b.lastHit = { by: a, t: now };
+    // Mega cars flatten whatever they touch; full-size cars squash zapped tiny ones.
+    if (a.mega > 0 !== b.mega > 0) { const [big, small] = a.mega > 0 ? [a, b] : [b, a]; if (!(small.shield > 0)) { this.wreck(small, big); return; } }
+    if (a.tiny > 0 !== b.tiny > 0) { const [small, big] = a.tiny > 0 ? [a, b] : [b, a]; if (v > 5) { this.wreck(small, big); return; } }
     if (v < 17 || Math.random() < 0.4) return;
     // The slower car (or the one that isn't shielded) loses the exchange.
     let victim = a.fwdSpeed < b.fwdSpeed ? a : b;
@@ -500,7 +504,8 @@ export class Action {
 
     const p1 = s.humans[0];
     if (by?.isHuman) {
-      s.style.event(by, v.isCop ? 'COP TAKEDOWN' : 'TAKEDOWN', v.isCop ? 600 : 400, '#ff2e63');
+      const label = v.isCop ? 'COP TAKEDOWN' : by.mega > 0 ? 'MEGA CRUSH' : v.tiny > 0 ? 'SQUASHED' : 'TAKEDOWN';
+      s.style.event(by, label, v.isCop ? 600 : 400, '#ff2e63');
       by.boost = Math.min(1, by.boost + 0.3);
       s.hud.center(v.isCop ? 'COP DOWN!' : 'TAKEDOWN!', 1.2, by.player);
     }
@@ -525,14 +530,18 @@ export class Action {
     if (car.remote) { car.blink = 2; return; }
     if (car.isCop) {
       // Cops come back behind whoever they were chasing.
-      const h = s.humans[0];
-      const i = t.wrap(h.trackIndex - 70);
+      const h = car.target && !car.target.left ? car.target : s.humans[0];
+      const raw = h.trackIndex - 70, i = t.wrap(raw);
       car.place(t.px[i], t.pz[i], Math.atan2(t.tx[i], t.tz[i]));
       car.trackIndex = i;
+      car.lap = h.lap - (raw < 0 ? 1 : 0);
+      car.progress = car.lap * t.N + i;
+      car.finished = false;
     } else s.resetCar(car);
     // Back on the road facing forward, with a running start and a moment of invulnerability.
     const i = t.wrap(car.trackIndex), sp = car.isCop ? 30 : 24;
     car.vx = t.tx[i] * sp; car.vz = t.tz[i] * sp; car.fwdSpeed = sp;
+    car.trail?.reset();
     car.ghost = 2;
     car.blink = 2;
     car.lastHit = null;
@@ -560,17 +569,15 @@ export class Action {
         const nx = dx / d, nz = dz / d, vn = -(c.vx * nx + c.vz * nz);
         if (o.kind === 'barrels') {
           // Smash straight through, scattering barrels, at the cost of speed.
-          o.down = 8;
-          o.mesh.visible = false;
-          this.debris.burst({ x: o.x, y: 0, z: o.z }, 9, 0xe63946);
-          s.fx.sparks.emit(o.x, 0.8, o.z, 30, 0xffd27a, 8, 4);
+          this.smash(o);
+          s.net?.send({ t: 'ob', id: c.id, i: this.obstacles.indexOf(o) });
           c.vx *= 0.6; c.vz *= 0.6;
           if (c.cam) c.cam.shake = Math.max(c.cam.shake, 0.6);
           if (c.isHuman) { s.hud.popup(c.player, 'BARRELS!', '#ff6fa8'); beep(140, 0.25, 'square', 0.2); }
           break;
         }
         c.pos.x += nx * (R - d); c.pos.z += nz * (R - d);
-        if (vn > 22) { this.wreck(c, null); continue; }
+        if (vn > 22) { this.wreck(c, null); if (c.wreck > 0) continue; }
         if (vn > 0) { c.vx += nx * vn * 1.5; c.vz += nz * vn * 1.5; c.vx *= 0.8; c.vz *= 0.8; }
         if (vn > 6) {
           s.fx.sparks.emit(c.pos.x - nx * 1.2, 0.7, c.pos.z - nz * 1.2, 25, 0xffd27a, 7, 3);
@@ -578,6 +585,13 @@ export class Action {
         }
       }
     }
+  }
+
+  smash(o) {
+    o.down = 8;
+    o.mesh.visible = false;
+    this.debris.burst({ x: o.x, y: 0, z: o.z }, 9, 0xe63946);
+    this.s.fx.sparks.emit(o.x, 0.8, o.z, 30, 0xffd27a, 8, 4);
   }
 
   /** AI drivers swerve around roadblocks they can see coming. */
@@ -600,7 +614,7 @@ export class Action {
   update(dt, counting) {
     const s = this.s;
     for (const car of [...s.cars, ...this.cops]) {
-      if (!s.powers && car.ghost > 0) car.ghost = Math.max(0, car.ghost - dt);
+      if ((!s.powers || car.isCop) && car.ghost > 0) car.ghost = Math.max(0, car.ghost - dt);
       car.busted = Math.max(0, (car.busted ?? 0) - dt);
       if (car.wreck > 0) {
         const w = car.wv;
@@ -642,6 +656,7 @@ export class Action {
         s.hud.center('BUSTED', 2, h.player);
         s.hud.msg('🚨 HELD FOR 3 SECONDS', 2.5, h.player, '#ff5a6e');
         for (const c of this.cops) c.hold = 4;
+        if (s.net && !s.authority) s.net.send({ t: 'bust' });
         beep(880, 0.25, 'square', 0.25);
         setTimeout(() => beep(660, 0.25, 'square', 0.25), 260);
       }
@@ -707,8 +722,10 @@ export class Action {
 
   onNet(m) {
     const car = this.s.byId?.get(m.id);
-    if (!car) return;
+    if (!car && m.t !== 'bust' && m.t !== 'ob') return;
     if (m.t === 'wk') this.wreck(car, this.s.byId.get(m.by) ?? null, true);
+    else if (m.t === 'bust') for (const c of this.cops) c.hold = 4;
+    else if (m.t === 'ob') { const o = this.obstacles[m.i]; if (o && !(o.down > 0)) this.smash(o); }
     else if (m.t === 'sw') this.shockwave(car, true);
   }
 

@@ -5,7 +5,7 @@ import { Car } from './car.js';
 import { AIDriver } from './ai.js';
 import { readControls } from './input.js';
 import { makeEnvMap, makeSky, makeLights, makeLabel, rng, smoothstep, addTrees, addRocks, addBuildings, canvasTex, makeMountains } from './env.js';
-import { ChaseCam, collideCars, Smoke, hideNearCameras } from './common.js';
+import { ChaseCam, collideCars, Smoke, hideNearCameras, disposeScene } from './common.js';
 import { HUD, Minimap } from './hud.js';
 import { EngineSound, beep } from './audio.js';
 import { save, persist } from './save.js';
@@ -653,10 +653,6 @@ export class WorldSession {
     for (const h of this.humans) h.engine.stop();
     this.hud.dispose();
     this.smoke.dispose();
-    this.scene.traverse(o => {
-      o.geometry?.dispose();
-      const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
-      for (const m of mats) { m.map?.dispose(); m.dispose(); }
-    });
+    disposeScene(this.scene);
   }
 }

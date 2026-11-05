@@ -9,13 +9,18 @@ export const ITEMS = {
   oil: { icon: '🛢️', name: 'Oil Slick', color: '#b388ff' },
   bubble: { icon: '🫧', name: 'Bubble Shield', color: '#5bc0ff' },
   rocket: { icon: '🔥', name: 'Rocket Boost', color: '#ffb703' },
+  mega: { icon: '🍄', name: 'Mega Car', color: '#3ddc84' },
+  lightning: { icon: '⚡', name: 'Lightning', color: '#fff275' },
 };
+
+const MEGA_TIME = 7;
+const TINY_TIME = 4.5;
 
 // Leaders get defensive items, cars at the back get weapons and speed.
 const ODDS = {
-  front: { mine: 3, oil: 3, bubble: 3, missile: 1, rocket: 0 },
-  mid: { missile: 3, mine: 2, oil: 2, bubble: 1, rocket: 2 },
-  back: { missile: 4, rocket: 4, bubble: 1, mine: 1, oil: 0 },
+  front: { mine: 3, oil: 3, bubble: 3, missile: 1, rocket: 0, mega: 0, lightning: 0 },
+  mid: { missile: 3, mine: 2, oil: 2, bubble: 1, rocket: 2, mega: 1, lightning: 0.5 },
+  back: { missile: 4, rocket: 3, bubble: 1, mine: 1, oil: 0, mega: 2, lightning: 1.5 },
 };
 
 const RESPAWN = 4;
@@ -63,6 +68,7 @@ export class Items {
 
     this.missiles = [];
     this.hazards = [];
+    this.bolts = [];
     this.flash = new THREE.PointLight(0xffa040, 0, 45, 1.5);
     scene.add(this.flash);
     this.keys = new Map();
@@ -137,6 +143,26 @@ export class Items {
       this.ensureShield(car);
       if (car.isHuman && !net) s.style.event(car, 'BUBBLE SHIELD', 50, '#5bc0ff');
       beep(800, 0.2, 'sine', 0.2);
+    } else if (id === 'mega') {
+      car.mega = MEGA_TIME;
+      s.fx.rings.emit(car.pos.x, car.pos.y, car.pos.z, 0x3ddc84, 12, 0.5);
+      if (car.isHuman && !net) { s.style.event(car, 'MEGA CAR!', 150, '#3ddc84'); s.hud.center('MEGA!', 1, car.player); car.cam.shake = 0.8; }
+      beep(110, 0.25, 'square', 0.25); setTimeout(() => beep(220, 0.25, 'square', 0.25), 150); setTimeout(() => beep(440, 0.4, 'square', 0.25), 300);
+    } else if (id === 'lightning') {
+      // Strikes every rival ahead of the user. Each client shrinks only the cars it owns.
+      for (const o of s.cars) {
+        if (o === car || o.eliminated || (car.team && o.team === car.team) || o.progress <= car.progress) continue;
+        this.bolt(o);
+        if (!o.remote && !(o.shield > 0) && !(o.mega > 0)) {
+          o.tiny = TINY_TIME;
+          o.vx *= 0.5; o.vz *= 0.5;
+          if (o.isHuman) s.hud.center('ZAPPED!', 1, o.player);
+        }
+      }
+      this.flash.position.set(car.pos.x, 30, car.pos.z);
+      this.flash.intensity = 3000;
+      if (car.isHuman && !net) s.style.event(car, 'LIGHTNING STRIKE', 300, '#fff275');
+      beep(60, 1.2, 'sawtooth', 0.4);
     } else if (id === 'rocket') {
       car.shockNitro = 2.6;
       s.fx.rings.emit(car.pos.x - fx * 2, car.pos.y, car.pos.z - fz * 2, 0xffb703, 14, 0.45);
@@ -172,8 +198,26 @@ export class Items {
   }
 
   /** A hit: shields soak it, otherwise the car is wrecked. */
+  /** Jagged bolt from the sky onto a car, fading out over half a second. */
+  bolt(car) {
+    const pts = [];
+    let x = car.pos.x + (Math.random() - 0.5) * 6, z = car.pos.z + (Math.random() - 0.5) * 6;
+    for (let y = 60; y > 0; y -= 6) {
+      pts.push(new THREE.Vector3(x, y, z));
+      x += (car.pos.x - x) * 0.25 + (Math.random() - 0.5) * 4;
+      z += (car.pos.z - z) * 0.25 + (Math.random() - 0.5) * 4;
+    }
+    pts.push(new THREE.Vector3(car.pos.x, car.pos.y + 1, car.pos.z));
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: new THREE.Color(0xd8f0ff).multiplyScalar(6), toneMapped: false, transparent: true }));
+    this.s.scene.add(line);
+    this.bolts.push({ line, life: 0.5 });
+    this.s.fx.sparks.emit(car.pos.x, car.pos.y + 1, car.pos.z, 50, 0xbfe6ff, 8, 6);
+  }
+
   strike(victim, owner, label) {
     const s = this.s;
+    if (victim.mega > 0) return;
     if (victim.shield > 0) {
       victim.shield = 0;
       if (victim.isHuman) s.hud.popup(victim.player, 'SHIELD BLOCKED', '#5bc0ff');
@@ -268,6 +312,11 @@ export class Items {
     }
     this.hazards = this.hazards.filter(h => h.life > 0);
 
+    for (const c of cars) {
+      c.mega = Math.max(0, (c.mega ?? 0) - dt);
+      c.tiny = Math.max(0, (c.tiny ?? 0) - dt);
+    }
+
     // Spin-outs: the car whips round twice and loses grip for a second.
     for (const c of cars) {
       if (!(c.spinOut > 0)) continue;
@@ -300,6 +349,8 @@ export class Items {
       case 'missile': { const t = this.targetFor(c); return !!t && Math.hypot(t.pos.x - c.pos.x, t.pos.z - c.pos.z) < 160; }
       case 'mine': case 'oil': return behind;
       case 'bubble': return this.missiles.some(m => m.target === c) || c.itemAge > 12;
+      case 'mega': return cars.some(o => Math.hypot(o.pos.x - c.pos.x, o.pos.z - c.pos.z) < 30) || c.itemAge > 8;
+      case 'lightning': return cars.some(o => o.progress > c.progress);
       default: return (c.ai?.bend ?? 1) < 0.1;
     }
   }
@@ -316,6 +367,18 @@ export class Items {
     }
     for (const h of this.hazards) if (h.m.light) h.m.light.visible = Math.floor(t * 4) % 2 === 0;
     this.flash.intensity *= Math.exp(-dt * 7);
+    for (const b of this.bolts) {
+      b.life -= dt;
+      b.line.material.opacity = Math.max(0, b.life * 2) * (Math.random() < 0.3 ? 0.3 : 1);
+      if (b.life <= 0) { s.scene.remove(b.line); b.line.geometry.dispose(); b.line.material.dispose(); }
+    }
+    this.bolts = this.bolts.filter(b => b.life > 0);
+    // Mega cars swell to giant size; zapped cars shrink. Scale eases so it reads as growth.
+    for (const c of [...s.cars, ...this.action.cops]) {
+      const want = c.mega > 0 ? 2.3 : c.tiny > 0 ? 0.5 : 1;
+      const k = c.mesh.scale.x + (want - c.mesh.scale.x) * Math.min(1, dt * 6);
+      c.mesh.scale.setScalar(k);
+    }
     for (const c of s.cars) if (c.shieldMesh && !s.powers) c.shieldMesh.visible = c.shield > 0;
   }
 

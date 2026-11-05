@@ -54,6 +54,8 @@ export class MenuSession {
     const key = id + ':' + color;
     if (this.current === key) return;
     this.current = key;
+    // Free the previous car's materials (geometry is shared by all cars).
+    this.turn.traverse(o => { if (o.isMesh) o.material.dispose(); });
     this.turn.clear();
     this.turn.add(buildCarMesh(color).group);
   }
