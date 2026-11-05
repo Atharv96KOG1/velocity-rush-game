@@ -4,7 +4,8 @@ export const REWINDS = 3; // uses per race
 
 const FIELDS = ['yaw', 'vx', 'vz', 'fwdSpeed', 'latSpeed', 'steerVis', 'lap', 'trackIndex', 'progress', 'boost',
   'finished', 'finishTime', 'driftScore', 'lapStart', 'bestLap', 'turbo', 'shield', 'ghost', 'stun', 'padBoost', 'stuck',
-  'shockNitro', 'air', 'vy', 'airT', 'roll', 'pitch', 'visYaw', 'wreck', 'busted', 'bust'];
+  'shockNitro', 'air', 'vy', 'airT', 'roll', 'pitch', 'visYaw', 'wreck', 'busted', 'bust',
+  'manual', 'flipA', 'spinA', 'rollA', 'item', 'spinOut'];
 
 /** Ring buffer of race snapshots; holding the rewind key plays them back in reverse. */
 export class Rewind {

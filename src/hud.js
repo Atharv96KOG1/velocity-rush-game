@@ -19,6 +19,7 @@ export class HUD {
       v.style.height = height + '%';
       v.innerHTML = `
         <div class="speedlines"></div><div class="vignette"></div>
+        <div class="hud-item"><div class="it-icon"></div><div class="it-name"></div></div>
         <div class="hud-power"><div class="pw-icon"></div><div class="pw-body"><div class="pw-name"></div><div class="pw-bar"><i></i></div></div></div>
         <div class="hud-pos"></div><div class="hud-info"></div><div class="hud-drift"></div>
         <div class="hud-msg"></div><div class="hud-center"></div><div class="hud-feed"></div><div class="hud-combo"></div>
@@ -26,7 +27,7 @@ export class HUD {
       this.el.appendChild(v);
       const q = s => v.querySelector(s);
       this.views.push({ pos: q('.hud-pos'), info: q('.hud-info'), drift: q('.hud-drift'), msg: q('.hud-msg'), center: q('.hud-center'), speed: q('.hud-speed b'), boost: q('.boost'), boostFill: q('.boost i'),
-        feed: q('.hud-feed'), combo: q('.hud-combo'), lines: q('.speedlines'), vignette: q('.vignette'), power: q('.hud-power'), pwIcon: q('.pw-icon'), pwName: q('.pw-name'), pwFill: q('.pw-bar i') });
+        feed: q('.hud-feed'), combo: q('.hud-combo'), lines: q('.speedlines'), vignette: q('.vignette'), power: q('.hud-power'), item: q('.hud-item'), itIcon: q('.it-icon'), itName: q('.it-name'), pwIcon: q('.pw-icon'), pwName: q('.pw-name'), pwFill: q('.pw-bar i') });
       this.timers.push({ msg: 0, center: 0 });
     }
     if (team) {
@@ -67,6 +68,14 @@ export class HUD {
     const rush = (Math.round((d.rush ?? 0) * 20) / 20).toString();
     if (this.cache.get(i + 'r') !== rush) { this.cache.set(i + 'r', rush); v.lines.style.opacity = rush; }
     if (this.cache.get(i + 'v') !== (d.tint ?? '')) { this.cache.set(i + 'v', d.tint ?? ''); v.vignette.style.boxShadow = d.tint ? `inset 0 0 160px 40px ${d.tint}` : 'none'; }
+    const it = d.item;
+    v.item.style.display = it ? '' : 'none';
+    if (it) {
+      this.put(v.itIcon, i + 'ii', it.icon || '·');
+      this.put(v.itName, i + 'in', it.name);
+      if (this.cache.get(i + 'ir') !== it.ready) { this.cache.set(i + 'ir', it.ready); v.item.classList.toggle('ready', it.ready); }
+      if (it.color && this.cache.get(i + 'ic') !== it.color) { this.cache.set(i + 'ic', it.color); v.item.style.setProperty('--it', it.color); }
+    }
     const p = d.power;
     v.power.style.display = p ? '' : 'none';
     if (!p) return;

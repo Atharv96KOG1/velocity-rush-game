@@ -138,3 +138,20 @@ export class Smoke {
 
   dispose() { for (const it of this.items) it.s.material.dispose(); }
 }
+
+/**
+ * Hides cars that pass right through a camera. Otherwise a car overtaking through
+ * the chase camera fills the screen with its dark underside for a few frames.
+ */
+export function hideNearCameras(cars, cameras, radius = 3.4) {
+  for (const c of cars) {
+    if (c.eliminated || c.left) continue;
+    const p = c.mesh.position;
+    let near = false;
+    for (const cam of cameras) {
+      const dx = cam.position.x - p.x, dy = cam.position.y - (p.y + 0.8), dz = cam.position.z - p.z;
+      if (dx * dx + dy * dy + dz * dz < radius * radius && !c.isHuman) near = true;
+    }
+    c.mesh.visible = !near;
+  }
+}

@@ -11,6 +11,7 @@ export const carById = id => CARS.find(c => c.id === id) ?? CARS[0];
 export const THEMES = {
   day: { skyTop: 0x2f7fd8, skyBottom: 0xd6ecff, fog: 0xd6ecff, ground: 0x4f8a3c, groundAlt: 0x3f7a30, sun: 0xffffff, sunI: 2.6, amb: 1.1, night: false, scenery: 'forest' },
   desert: { skyTop: 0xd0703c, skyBottom: 0xffe3b8, fog: 0xf3d2a4, ground: 0xc58a4f, groundAlt: 0xb37742, sun: 0xfff0d6, sunI: 2.8, amb: 1.0, night: false, scenery: 'desert' },
+  snow: { skyTop: 0x4f86c6, skyBottom: 0xeaf2fb, fog: 0xe1eaf3, ground: 0xe6edf4, groundAlt: 0xd8e2ec, sun: 0xffffff, sunI: 2.4, amb: 1.15, night: false, scenery: 'snow' },
   night: { skyTop: 0x03040c, skyBottom: 0x2a1650, fog: 0x160c2e, ground: 0x1b1b26, groundAlt: 0x15151e, sun: 0x9aa6ff, sunI: 0.7, amb: 0.75, night: true, scenery: 'city' },
 };
 
@@ -30,6 +31,16 @@ export const TRACKS = {
     name: 'Neon City', theme: 'night', width: 17,
     desc: 'Midnight street circuit with a brutal chicane.',
     points: [[-200, -200], [0, -220], [200, -200], [220, -50], [100, 0], [220, 60], [220, 200], [0, 220], [-100, 120], [-220, 200], [-240, 0]],
+  },
+  skyline: {
+    name: 'Skyline Gauntlet', theme: 'night', width: 13, hard: true,
+    desc: 'HARD · Narrow downtown streets, four hairpins and no room for error.',
+    points: [[-250, -200], [-50, -230], [60, -160], [200, -220], [280, -120], [180, -60], [290, 20], [260, 160], [140, 120], [60, 220], [-80, 170], [-20, 60], [-160, 40], [-260, 120], [-300, -60]],
+  },
+  glacier: {
+    name: 'Glacier Run', theme: 'snow', width: 14, hard: true,
+    desc: 'HARD · Icy mountain pass: low grip, blind hairpins and falling snow.',
+    points: [[0, -260], [160, -240], [260, -150], [200, -60], [300, 40], [240, 180], [100, 140], [60, 260], [-100, 240], [-60, 120], [-200, 80], [-280, -40], [-160, -60], [-220, -180]],
   },
 };
 
@@ -57,6 +68,8 @@ export const CHALLENGES = [
   { id: 'c5', title: 'City Sprint', desc: 'Average 125 km/h through Neon City over two laps.', track: 'neon', type: 'timeTrial', laps: 2, goal: { type: 'time', avg: 34.5 }, reward: 900 },
   { id: 'c7', title: 'Hot Pursuit', desc: 'Win a 6-car race with three police cars hunting you.', track: 'harbor', type: 'race', format: 'ffa', laps: 2, difficulty: 1.02, police: true, goal: { type: 'position', value: 1 }, reward: 1500 },
   { id: 'c8', title: 'Wrecking Crew', desc: 'Win a knockout at Red Canyon with police on the track.', track: 'canyon', type: 'knockout', format: 'ffa', laps: 6, difficulty: 1.0, police: true, goal: { type: 'survive' }, reward: 1500 },
+  { id: 'c9', title: 'Gauntlet', desc: 'Win a 6-car race on Skyline Gauntlet.', track: 'skyline', type: 'race', format: 'ffa', laps: 2, difficulty: 1.0, goal: { type: 'position', value: 1 }, reward: 1600 },
+  { id: 'c10', title: 'Ice Drift', desc: 'Score 5,000 drift points on Glacier Run.', track: 'glacier', type: 'drift', laps: 1, goal: { type: 'drift', value: 5000 }, reward: 1200 },
   { id: 'c6', title: 'Pro Duel', desc: 'Beat a hard rival over 3 laps at the harbor.', track: 'harbor', type: 'race', format: '1v1', laps: 3, difficulty: 1.1, goal: { type: 'position', value: 1 }, reward: 1000 },
 ];
 

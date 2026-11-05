@@ -3,7 +3,7 @@
 # 🏁 Velocity Rush
 
 **A fast 3D arcade racer that runs in your browser.**
-Story campaign · team races · police chases · takedowns · stunts · online multiplayer · open world · super powers
+Story campaign · weapons & mystery boxes · jumps & flips · police chases · takedowns · online multiplayer · open world
 
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES2022-f7df1e?logo=javascript&logoColor=black)
 ![Three.js](https://img.shields.io/badge/Three.js-r169-000000?logo=threedotjs&logoColor=white)
@@ -26,6 +26,7 @@ Story campaign · team races · police chases · takedowns · stunts · online m
 - [Quick start](#quick-start)
 - [Game modes](#game-modes)
 - [Super powers](#super-powers)
+- [Jumps, flips and mystery boxes](#jumps-flips-and-mystery-boxes)
 - [Takedowns, stunts and police](#takedowns-stunts-and-police)
 - [Style, weather and ghosts](#style-weather-and-ghosts)
 - [Rewind, photo mode and soundtrack](#rewind-photo-mode-and-soundtrack)
@@ -40,6 +41,8 @@ Story campaign · team races · police chases · takedowns · stunts · online m
 - **Tuned arcade handling.** 120 Hz fixed-step physics with grip, slip-angle limited drifting, nitro and slope gravity.
 - **Eight modes.** Story campaign, quick race, knockout, challenges, open world, split-screen and online play.
 - **1v1, 2v2, 3v3 and 6-car free-for-all**, with team scoring and AI teammates or rivals.
+- **Jump and flip.** Press `F` to jump. In the air, flip, spin and barrel-roll with your own keys, and land wheels-down or crash.
+- **Mystery boxes and weapons.** Rows of glowing **?** boxes hand out homing missiles, mines, oil slicks, bubble shields and rocket boosts to fire at rivals.
 - **Takedowns.** Slam a rival into the wall and the game drops into a slow-motion crash cam while the wreck tumbles and scatters debris.
 - **Police in races.** Cop cars with glowing lightbars and sirens hunt you down. They ram you, block your lane, and BUST you if you get pinned.
 - **Ramps and stunts.** Every circuit has jumps. Hit them for BIG AIR, barrel rolls and flat spins.
@@ -119,7 +122,12 @@ Open **http://localhost:8000**.
 | **Daily Challenge** | A new race, time trial, drift or knockout every day, generated from the date, with a 1,500 CR reward. |
 | **Achievements** | 12 goals, from breaking 300 km/h to collecting every coin, each paying credits. |
 
-**Tracks:** Harbor Loop (day, fast sweepers), Red Canyon (desert, tight hairpins) and Neon City (night, street circuit).
+**Tracks:**
+- Harbor Loop: day, fast sweepers
+- Red Canyon: desert, tight hairpins
+- Neon City: night street circuit
+- **Skyline Gauntlet (hard):** narrow night streets with four hairpins
+- **Glacier Run (hard):** snowy mountain pass with low grip and falling snow
 
 Progress, including credits, cars, powers, story chapters, challenge bests and open-world collectibles, is saved in your browser's `localStorage`.
 
@@ -135,6 +143,32 @@ Unlock powers with credits on the **Super Powers** screen and equip one. The met
 | 👻 | **Phantom Phase** | 4 s passing through cars with full grip off-road | 16 s |
 | 🌀 | **EMP Pulse** | Stalls every rival within 110 m for 2.5 s | 20 s |
 | ✦ | **Blink** | Teleports 45 m ahead along the road | 22 s |
+
+## Jumps, flips and mystery boxes
+
+<img src="docs/screenshots/glacier-items.jpg" alt="Mystery boxes on Glacier Run" width="100%">
+
+**Jump and air tricks.** Press `F` (P2: `;`, gamepad B) to hop about 2 metres up for roughly one second. Ramps send you higher. While airborne:
+
+| Keys | Trick | Points |
+|---|---|---|
+| `W` / `S` | Front flip / backflip | 300 per rotation |
+| `A` / `D` | 360 spin | 220 per rotation |
+| `Space` + `A` / `D` | Barrel roll | 320 per rotation |
+
+Mix them for DOUBLE and TRIPLE combos; two or more in one jump shouts **INSANE!** Every trick refills nitro. Land within about 60° of wheels-down or you crash (**BAD LANDING**).
+
+**Mystery boxes.** Four rows of three spinning **?** boxes sit on every circuit and come back 4 seconds after they're hit. Drive through one with an empty slot to get a random item, then press `X` (P2: `'`, gamepad Y) to use it. Leaders mostly get defensive items; cars at the back get weapons and speed.
+
+| | Item | Effect |
+|---|---|---|
+| 🚀 | Homing Missile | Locks onto the car ahead, flies at 340 km/h and wrecks it |
+| 💣 | Mine | Dropped behind you; any car that touches it explodes |
+| 🛢️ | Oil Slick | Dropped behind you; cars that hit it spin out and lose half their speed |
+| 🫧 | Bubble Shield | 6 seconds of protection; absorbs one missile, mine or oil slick |
+| 🔥 | Rocket Boost | 2.6-second surge, stronger than nitro |
+
+Rivals pick up and fire items too. Watch for **MISSILE INCOMING!**
 
 ## Takedowns, stunts and police
 
@@ -200,9 +234,12 @@ Unlock powers with credits on the **Super Powers** screen and equip one. The met
 | Brake / reverse | `S` | `↓` | LT |
 | Steer | `A` `D` | `←` `→` | Left stick |
 | Handbrake / drift | `Space` | `/` or `Right Ctrl` | A |
-| Nitro (double-tap: shockwave) | `Left Shift` | `Right Shift` | X / B |
+| Nitro (double-tap: shockwave) | `Left Shift` | `Right Shift` | X |
+| Jump | `F` | `;` | B |
+| Air tricks | `W`/`S` flip · `A`/`D` spin · `Space`+`A`/`D` roll | arrows · `/`+arrows | stick |
+| Use item | `X` | `'` | Y |
 | Super power | `E` | `Enter` | LB |
-| Reset to road | `R` | `Backspace` | Y |
+| Reset to road | `R` | `Backspace` | Start |
 | Camera (chase / far / hood) | `C` | `.` | RB |
 | Rewind (hold) | `Q` | | Back |
 | Photo mode | `P` | | |
@@ -252,7 +289,8 @@ velocity-rush/
     ├── weather.js        Weather themes, fog ranges, rain particles and lightning
     ├── ghost.js          Ghost run recording and playback
     ├── achieve.js        Achievement unlocks and toast notifications
-    ├── action.js         Takedowns and crash cam, police, ramps and stunts, shockwave nitro, countdown flyby, dust
+    ├── action.js         Jumps and air tricks, takedowns and crash cam, police, ramps, shockwave nitro, countdown flyby, dust
+    ├── items.js          Mystery boxes, missiles, mines, oil slicks, shields and rocket boosts
     ├── rewind.js         Snapshot ring buffer for rewinding races
     ├── photo.js          Photo mode orbit camera and PNG export
     ├── music.js          Procedural synthwave soundtrack

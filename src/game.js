@@ -4,7 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { SpeedShader } from './post.js';
+import { SpeedShader, SanitizeShader } from './post.js';
 import { MenuSession } from './session-menu.js';
 import { music } from './music.js';
 import { save, persist } from './save.js';
@@ -30,6 +30,7 @@ export class Game {
     this.renderPass = new RenderPass(null, null);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.55, 0.5, 0.9);
     this.composer.addPass(this.renderPass);
+    this.composer.addPass(new ShaderPass(SanitizeShader));
     this.composer.addPass(this.bloom);
     this.post = new ShaderPass(SpeedShader);
     this.composer.addPass(this.post);

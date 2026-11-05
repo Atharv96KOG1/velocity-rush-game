@@ -5,7 +5,7 @@ import { Car } from './car.js';
 import { AIDriver } from './ai.js';
 import { readControls } from './input.js';
 import { makeEnvMap, makeSky, makeLights, makeLabel, rng, smoothstep, addTrees, addRocks, addBuildings, canvasTex, makeMountains } from './env.js';
-import { ChaseCam, collideCars, Smoke } from './common.js';
+import { ChaseCam, collideCars, Smoke, hideNearCameras } from './common.js';
 import { HUD, Minimap } from './hud.js';
 import { EngineSound, beep } from './audio.js';
 import { save, persist } from './save.js';
@@ -594,6 +594,7 @@ export class WorldSession {
       }
       this.hud.set(i, this.hudFor(h));
     });
+    hideNearCameras(this.traffic, this.humans.map(h => h.cam.camera));
     this.lights.follow(this.humans[0].pos);
     const p1 = this.humans[0];
     this.post = { ...this.post, speed: Math.min(1, Math.max(0, (p1.kmh - 150) / 170) + (p1.nitroOn ? 0.25 : 0) + (p1.turbo > 0 ? 0.45 : 0)) };

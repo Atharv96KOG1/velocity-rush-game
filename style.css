@@ -200,3 +200,11 @@ table.results tr.me { background: rgba(8,217,214,.12); font-weight: 700; }
 .upg { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; font-size: 14px; margin-top: 4px; color: var(--muted); }
 .upg .pips { color: var(--accent2); letter-spacing: 2px; }
 .upg .chip { padding: 3px 10px; font-size: 13px; }
+
+/* Item slot */
+.hud-item { --it: #ffffff; position: absolute; right: 26px; bottom: 190px; display: flex; align-items: center; gap: 10px; font-family: 'Orbitron'; text-shadow: 0 2px 8px #000; flex-direction: row-reverse; }
+.it-icon { width: 58px; height: 58px; display: grid; place-items: center; font-size: 30px; border-radius: 10px; background: rgba(0,0,0,.45); border: 2px dashed rgba(255,255,255,.25); }
+.hud-item.ready .it-icon { border: 2px solid var(--it); box-shadow: 0 0 18px var(--it), inset 0 0 10px var(--it); animation: pulse .6s ease-in-out infinite alternate; }
+.it-name { font-size: 13px; letter-spacing: 1px; color: #cfd5ff; }
+.hud-item.ready .it-name { color: var(--it); }
+@media (max-width: 760px) { .hud-item { bottom: 150px; } .it-icon { width: 44px; height: 44px; font-size: 22px; } }

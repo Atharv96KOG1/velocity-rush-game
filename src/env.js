@@ -280,6 +280,9 @@ export function buildCircuitScenery(track, th) {
     sea.rotation.x = -Math.PI / 2;
     sea.position.set(0, 0.02, -850);
     g.add(sea);
+  } else if (th.scenery === 'snow') {
+    addTrees(g, pick(1100, 0, 650).map(p => ({ ...p, s: 0.8 + r() * 1.1 })));
+    addRocks(g, pick(160, 0, 700, 4).map(p => ({ ...p, sx: 2 + r() * 6, sy: 1.5 + r() * 4, sz: 2 + r() * 6 })), 0x8d96a3);
   } else if (th.scenery === 'desert') {
     addCacti(g, pick(260, 0, 600).map(p => ({ ...p, s: 0.7 + r() * 0.6 })));
     addRocks(g, pick(200, 0, 700, 4).map(p => ({ ...p, sx: 3 + r() * 8, sy: 2 + r() * 7, sz: 3 + r() * 8 })), 0xa0522d);
@@ -302,7 +305,7 @@ export function buildCircuitScenery(track, th) {
   head.castShadow = false;
   g.add(head);
 
-  g.add(makeMountains(th.night ? 0x1d1830 : th.scenery === 'desert' ? 0xa0522d : 0x4b6b4a, th.fog));
+  g.add(makeMountains(th.night ? 0x1d1830 : th.scenery === 'desert' ? 0xa0522d : th.scenery === 'snow' ? 0xf2f6fb : 0x4b6b4a, th.fog));
   g.add(grandstands(track, th));
   g.add(billboards(track, th));
   return g;

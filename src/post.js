@@ -39,3 +39,20 @@ export const SpeedShader = {
       gl_FragColor = vec4(col, 1.0);
     }`,
 };
+
+// Runs before bloom: replaces NaN/Inf pixels and clamps extreme HDR values. A single bad
+// pixel would otherwise be blurred by the bloom mips into large black squares.
+export const SanitizeShader = {
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse;
+    varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      if (any(isnan(c)) || any(isinf(c))) c = vec4(0.0, 0.0, 0.0, 1.0);
+      gl_FragColor = vec4(clamp(c.rgb, 0.0, 40.0), 1.0);
+    }`,
+};

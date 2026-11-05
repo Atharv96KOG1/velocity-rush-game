@@ -563,8 +563,11 @@ export class UI {
         <tr><td>Brake / Reverse</td><td><kbd>S</kbd></td><td><kbd>↓</kbd></td><td>LT</td></tr>
         <tr><td>Steer</td><td><kbd>A</kbd> <kbd>D</kbd></td><td><kbd>←</kbd> <kbd>→</kbd></td><td>Left stick</td></tr>
         <tr><td>Handbrake / Drift</td><td><kbd>Space</kbd></td><td><kbd>/</kbd> or <kbd>R-Ctrl</kbd></td><td>A</td></tr>
-        <tr><td>Nitro</td><td><kbd>L-Shift</kbd></td><td><kbd>R-Shift</kbd></td><td>X / B</td></tr>
-        <tr><td>Reset to road</td><td><kbd>R</kbd></td><td><kbd>Backspace</kbd></td><td>Y</td></tr>
+        <tr><td>Nitro (double-tap: shockwave)</td><td><kbd>L-Shift</kbd></td><td><kbd>R-Shift</kbd></td><td>X</td></tr>
+        <tr><td>Jump</td><td><kbd>F</kbd></td><td><kbd>;</kbd></td><td>B</td></tr>
+        <tr><td>Air tricks</td><td><kbd>W</kbd>/<kbd>S</kbd> flip · <kbd>A</kbd>/<kbd>D</kbd> spin · <kbd>Space</kbd>+<kbd>A</kbd>/<kbd>D</kbd> roll</td><td>Arrows · <kbd>/</kbd>+arrows</td><td>Stick</td></tr>
+        <tr><td>Use item</td><td><kbd>X</kbd></td><td><kbd>'</kbd></td><td>Y</td></tr>
+        <tr><td>Reset to road</td><td><kbd>R</kbd></td><td><kbd>Backspace</kbd></td><td>Start</td></tr>
         <tr><td>Camera</td><td><kbd>C</kbd></td><td><kbd>.</kbd></td><td>RB</td></tr>
         <tr><td>Super power</td><td><kbd>E</kbd></td><td><kbd>Enter</kbd></td><td>LB</td></tr>
         <tr><td>Rewind (hold)</td><td><kbd>Q</kbd></td><td></td><td>Back</td></tr>
@@ -573,6 +576,8 @@ export class UI {
         <tr><td>Pause</td><td colspan="3"><kbd>Esc</kbd></td></tr>
       </table>
       <div class="desc" style="margin-top:20px">Drifting fills the nitro bar. Driving flat out on tarmac trickles it too. Off-road slows you down.<br>
+        Air tricks: jump with F or launch off a ramp, rotate with the keys, and land wheels-down. Land crooked and you crash.<br>
+        Mystery boxes: drive through a <b>?</b> box for a missile, mine, oil slick, bubble shield or rocket boost, then press X.<br>
         Style points: tuck in behind a car to slipstream, pass close to cars for near misses, overtake and chain drifts. Landing tricks within 3 seconds builds a combo up to x5.</div>
       <div class="row"><button class="btn inline" data-go="showMain">Back</button></div></div>`);
   }

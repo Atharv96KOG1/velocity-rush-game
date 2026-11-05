@@ -20,16 +20,19 @@ export function fogRange(kind, night) {
   return [150, night ? 700 : 1100];
 }
 
-/** Rain streaks around the camera plus occasional lightning. */
+/** Rain streaks (or snowflakes) around the camera, with lightning in rain. */
 export class Rain {
-  constructor(scene, hemi, count = 2600) {
-    this.size = [130, 60, 130];
+  constructor(scene, hemi, count = 2600, { snow = false } = {}) {
+    this.snow = snow;
+    this.size = snow ? [110, 50, 110] : [130, 60, 130];
     this.count = count;
     const pos = new Float32Array(count * 6);
     for (let i = 0; i < count; i++) this.drop(pos, i, Math.random() * this.size[1]);
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    this.lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xb8d4ff, transparent: true, opacity: 0.45, fog: false }));
+    this.lines = snow
+      ? new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 0.22, transparent: true, opacity: 0.9 }))
+      : new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xb8d4ff, transparent: true, opacity: 0.45, fog: false }));
     this.lines.frustumCulled = false;
     scene.add(this.lines);
     this.hemi = hemi;
@@ -45,15 +48,18 @@ export class Rain {
   }
 
   update(dt, center) {
-    const a = this.lines.geometry.attributes.position.array, fall = 38 * dt;
+    const a = this.lines.geometry.attributes.position.array, fall = (this.snow ? 5 : 38) * dt;
+    const sway = this.snow ? Math.sin(performance.now() / 900) * dt * 1.2 : 0;
     for (let i = 0; i < this.count; i++) {
       const j = i * 6;
       a[j + 1] -= fall; a[j + 4] -= fall;
+      a[j] += sway; a[j + 3] += sway;
       if (a[j + 1] < 0) this.drop(a, i, this.size[1]);
     }
     this.lines.geometry.attributes.position.needsUpdate = true;
     this.lines.position.set(center.x, center.y - 8, center.z);
 
+    if (this.snow) return;
     this.nextBolt -= dt;
     if (this.nextBolt <= 0) {
       this.flash = 1;

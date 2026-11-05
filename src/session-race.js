@@ -5,7 +5,7 @@ import { Car } from './car.js';
 import { AIDriver } from './ai.js';
 import { readControls, IDLE } from './input.js';
 import { canvasTex, makeEnvMap, makeSky, makeLights, buildCircuitScenery, makeLabel, groundMesh } from './env.js';
-import { ChaseCam, collideCars, Smoke } from './common.js';
+import { ChaseCam, collideCars, Smoke, hideNearCameras } from './common.js';
 import { HUD, Minimap } from './hud.js';
 import { EngineSound, beep } from './audio.js';
 import { Sparks, Rings, Trail } from './fx.js';
@@ -16,6 +16,7 @@ import { GhostRecorder, GhostPlayer, loadGhost } from './ghost.js';
 import { unlock, count } from './achieve.js';
 import { Rewind, REWINDS } from './rewind.js';
 import { Action } from './action.js';
+import { Items } from './items.js';
 
 const TEAM_COLORS = { A: [0x3a86ff, 0x4cc9f0, 0x4361ee], B: [0xff006e, 0xf72585, 0xff5d8f] };
 const FFA_COLORS = [0xffbe0b, 0x8338ec, 0x06d6a0, 0xfb5607, 0xe5e5e5, 0x118ab2];
@@ -82,6 +83,7 @@ export class RaceSession {
     scene.add(buildCircuitScenery(track, th));
     this.smoke = new Smoke(scene);
     if (weather === 'rain') this.rain = new Rain(scene, this.lights.hemi);
+    else if (th.scenery === 'snow') this.rain = new Rain(scene, this.lights.hemi, 2200, { snow: true });
     this.fx = { sparks: new Sparks(scene), rings: new Rings(scene) };
     this.powers = cfg.powers ? new PowerSystem(scene, {
       fx: this.fx,
@@ -100,6 +102,7 @@ export class RaceSession {
     this.setupCars();
 
     if (weather === 'rain') for (const c of this.cars) c.gripMul = 0.82;
+    else if (th.scenery === 'snow') for (const c of this.cars) c.gripMul = 0.86;
 
     // Ghost of the best run in solo events.
     if (this.solo && this.humans.length === 1 && !this.net) {
@@ -121,8 +124,8 @@ export class RaceSession {
     this.hud = new HUD(this.humans.length, {
       team: this.teamMode, minimap: this.minimap,
       hint: this.humans.length === 2
-        ? 'P1: WASD · Space drift · L-Shift nitro · E power · R reset · C cam    |    P2: Arrows · / drift · R-Shift nitro · Enter power · Backspace reset · . cam'
-        : 'W/↑ gas · S/↓ brake · A D steer · SPACE drift · SHIFT nitro (double-tap: SHOCKWAVE) · E power · Q rewind · R reset · C camera · ESC pause',
+        ? 'P1: WASD · Space drift · L-Shift nitro · F jump · X item · E power    |    P2: Arrows · / drift · R-Shift nitro · ; jump · \' item · Enter power'
+        : 'W/↑ gas · S/↓ brake · A D steer · SPACE drift · SHIFT nitro (2× shockwave) · F jump (air: W/S flip, A/D spin, SPACE+A/D roll) · X item · E power · Q rewind · ESC pause',
     });
 
     this.style = new StyleTracker(this.hud, this.humans, {
@@ -134,9 +137,12 @@ export class RaceSession {
     });
     if (this.ghost) this.hud.msg(`👻 GHOST: YOUR BEST ${fmtTime(this.ghost.data.time)}`, 4);
     if (weather === 'rain') this.hud.msg('🌧️ WET TRACK · LESS GRIP', 3);
+    else if (th.scenery === 'snow') this.hud.msg('❄️ ICY TRACK · LESS GRIP', 3);
 
     // Ramps, takedowns, shockwave nitro, police and the countdown flyby (offline races).
     if (!this.net) this.action = new Action(this);
+    // Mystery boxes and weapons, on by default in offline races.
+    if (this.action && !this.solo && (cfg.items ?? true)) this.items = new Items(this, this.action);
 
     // Rewind: offline only (online races can't roll back other players), not in knockout.
     if (!this.net && cfg.type !== 'knockout') this.rewind = new Rewind(this);
@@ -421,6 +427,7 @@ export class RaceSession {
       if (!car.isHuman || car.finished) this.unstick(car, dt, counting);
     }
     this.action?.update(dt, counting);
+    this.items?.update(dt);
     this.powers?.update(dt);
     const solid = [...this.cars, ...(this.action?.cops ?? [])].filter(c => !c.eliminated && !(c.wreck > 0) && !c.air);
     collideCars(solid, (a, b, x, y, z, v) => {
@@ -720,6 +727,8 @@ export class RaceSession {
       this.hud.set(i, this.hudFor(h));
     });
     this.action?.frame(dt);
+    this.items?.frame(dt);
+    hideNearCameras([...this.cars, ...(this.action?.cops ?? [])], this.humans.map(h => h.cam.camera));
     this.lights.follow(this.humans[0].pos);
     const p1 = this.humans[0];
     this.post = { ...this.post, speed: Math.min(1, Math.max(0, (p1.kmh - 150) / 170) + (p1.nitroOn ? 0.25 : 0) + (p1.turbo > 0 ? 0.45 : 0) + (p1.padBoost > 0 ? 0.3 : 0) + (p1.shockNitro > 0 ? 0.6 : 0)) };
@@ -766,10 +775,11 @@ export class RaceSession {
     } else if (h.driftCombo > 150) {
       drift = `DRIFT +${Math.round(h.driftCombo)}`;
     }
-    return { pos, info: lines.join('\n'), drift, kmh: h.kmh, boost: h.boost, nitro: h.nitroOn, ...fxHud(h) };
+    return { pos, info: lines.join('\n'), drift, kmh: h.kmh, boost: h.boost, nitro: h.nitroOn, ...fxHud(h), item: this.items?.hud(h) };
   }
 
   dispose() {
+    this.items?.dispose();
     this.action?.dispose();
     this.scene.environment?.dispose();
     this.unsub?.forEach(f => f());

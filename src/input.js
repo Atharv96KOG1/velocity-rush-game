@@ -9,8 +9,8 @@ addEventListener('keyup', e => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
 
 export const LAYOUTS = [
-  { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], hand: ['Space'], nitro: ['ShiftLeft'], reset: ['KeyR'], cam: ['KeyC'], power: ['KeyE'], rewind: ['KeyQ'], photo: ['KeyP'] },
-  { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], hand: ['Slash', 'ControlRight'], nitro: ['ShiftRight'], reset: ['Backspace'], cam: ['Period'], power: ['Enter', 'Numpad0'], rewind: [], photo: [] },
+  { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], hand: ['Space'], nitro: ['ShiftLeft'], reset: ['KeyR'], cam: ['KeyC'], power: ['KeyE'], rewind: ['KeyQ'], photo: ['KeyP'], jump: ['KeyF'], item: ['KeyX'] },
+  { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], hand: ['Slash', 'ControlRight'], nitro: ['ShiftRight'], reset: ['Backspace'], cam: ['Period'], power: ['Enter', 'Numpad0'], rewind: [], photo: [], jump: ['Semicolon', 'Numpad1'], item: ['Quote', 'Numpad2'] },
 ];
 
 // Single player may use either WASD or the arrow keys.
@@ -30,9 +30,12 @@ export function readControls(player, solo) {
     cam: held(L.cam),
     power: held(L.power),
     rewind: held(L.rewind),
+    jump: held(L.jump),
+    item: held(L.item),
   };
 
-  // Gamepad N drives player N (standard mapping: RT gas, LT brake, A handbrake, X/B nitro, Y reset, RB camera).
+  // Gamepad N drives player N (standard mapping: RT gas, LT brake, A handbrake, B jump, X nitro, Y item,
+  // LB power, RB camera, Back rewind, Start reset).
   const pads = [...(navigator.getGamepads?.() ?? [])].filter(Boolean);
   const pad = pads[player];
   if (pad) {
@@ -42,8 +45,10 @@ export function readControls(player, solo) {
     c.throttle = Math.max(c.throttle, b(7).value);
     c.brake = Math.max(c.brake, b(6).value);
     c.hand ||= b(0).pressed;
-    c.nitro ||= b(2).pressed || b(1).pressed;
-    c.reset ||= b(3).pressed;
+    c.nitro ||= b(2).pressed;
+    c.jump ||= b(1).pressed;
+    c.item ||= b(3).pressed;
+    c.reset ||= b(9).pressed;
     c.cam ||= b(5).pressed;
     c.power ||= b(4).pressed;
     c.rewind ||= b(8).pressed;
@@ -51,4 +56,4 @@ export function readControls(player, solo) {
   return c;
 }
 
-export const IDLE = { throttle: 0, brake: 0, steer: 0, hand: false, nitro: false, reset: false, cam: false, power: false };
+export const IDLE = { throttle: 0, brake: 0, steer: 0, hand: false, nitro: false, reset: false, cam: false, power: false, jump: false, item: false };

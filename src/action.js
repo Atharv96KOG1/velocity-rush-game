@@ -9,6 +9,10 @@ import { Smoke } from './common.js';
 const GRAVITY = 24;          // arcade gravity, m/s²
 const SLOWMO = 0.25;         // time scale during crash cam
 const BUST_TIME = 2.2;       // seconds pinned by a cop before you're busted
+const JUMP_SPEED = 11.5;     // take-off speed of the jump button, m/s (≈1 s of air)
+const TRICK_RATE = 9.5;      // rad/s of flip / spin / roll while a key is held
+const TAU = Math.PI * 2;
+const MULTI = ['', '', 'DOUBLE ', 'TRIPLE ', 'QUAD '];
 
 /** Flying car parts after a crash. */
 class Debris {
@@ -212,11 +216,16 @@ export class Action {
 
   /** Adjusts a car's controls: busted cars are frozen; a quick double-tap of nitro fires a shockwave. */
   filter(car, c) {
+    car.rawInput = c;
     if (car.busted > 0) return { throttle: 0, brake: 1, steer: 0, hand: false, nitro: false };
     const s = this.s;
     if (s.state !== 'race') return c;
     if (car.isHuman) {
-      const tp = this.taps.get(car) ?? { prev: false, at: -9 };
+      const tp = this.taps.get(car) ?? { prev: false, at: -9, jump: false };
+      if (c.jump && !tp.jump && !car.air && car.pos.y < 0.25 && car.wreck <= 0) this.jump(car);
+      tp.jump = c.jump;
+      // In the air the keys drive tricks, not the wheels.
+      if (car.air) { this.taps.set(car, tp); return { ...c, steer: 0, hand: false, throttle: 0, brake: 0 }; }
       if (c.nitro && !tp.prev) {
         if (s.time - tp.at < 0.32 && car.boost >= 0.4) this.shockwave(car);
         tp.at = s.time;
@@ -227,6 +236,21 @@ export class Action {
       this.shockwave(car);
     }
     return c;
+  }
+
+  jump(car) {
+    car.air = true;
+    car.airT = 0;
+    car.vy = JUMP_SPEED;
+    car.airDur = (2 * JUMP_SPEED) / GRAVITY;
+    this.startTricks(car);
+    for (let k = 0; k < 5; k++) this.dust.emit(car.pos.x, car.pos.y, car.pos.z, 1.2);
+    beep(420, 0.12, 'triangle', 0.15);
+  }
+
+  startTricks(car) {
+    car.manual = car.isHuman;
+    car.flipA = car.spinA = car.rollA = 0;
   }
 
   shockwave(car) {
@@ -266,10 +290,21 @@ export class Action {
       car.vy -= GRAVITY * dt;
       car.pos.y += car.vy * dt;
       car.airT += dt;
-      const k = Math.min(1, car.airT / car.airDur);
-      if (car.stunt === 'roll') car.roll = k * Math.PI * 2 * car.stuntDir;
-      else if (car.stunt === 'spin') car.visYaw = k * Math.PI * 2 * car.stuntDir;
-      car.pitch = Math.max(-0.35, Math.min(0.3, -car.vy * 0.02));
+      if (car.manual) {
+        // Player tricks: W/S flip, A/D spin, drift + A/D barrel roll.
+        const c = car.rawInput ?? {};
+        car.flipA += ((c.throttle ?? 0) - (c.brake ?? 0)) * TRICK_RATE * dt;
+        if (c.hand) car.rollA += (c.steer ?? 0) * TRICK_RATE * dt;
+        else car.spinA += (c.steer ?? 0) * TRICK_RATE * dt;
+        car.pitch = car.flipA + Math.max(-0.35, Math.min(0.3, -car.vy * 0.02));
+        car.visYaw = car.spinA;
+        car.roll = car.rollA;
+      } else {
+        const k = Math.min(1, car.airT / car.airDur);
+        if (car.stunt === 'roll') car.roll = k * TAU * car.stuntDir;
+        else if (car.stunt === 'spin') car.visYaw = k * TAU * car.stuntDir;
+        car.pitch = Math.max(-0.35, Math.min(0.3, -car.vy * 0.02));
+      }
       if (car.pos.y <= g) this.land(car, g);
       return;
     }
@@ -285,6 +320,9 @@ export class Action {
       car.airDur = (2 * car.vy) / GRAVITY + 0.3;
       car.stuntDir = Math.random() < 0.5 ? -1 : 1;
       car.stunt = car.lastRamp?.twist ? 'roll' : car.drifting || Math.abs(car.latSpeed) > 4 ? 'spin' : null;
+      this.startTricks(car);
+      // Stunt ramps throw players higher so there's time for tricks.
+      if (car.manual && car.lastRamp?.twist) { car.vy += 3; car.airDur = (2 * car.vy) / GRAVITY + 0.3; }
     } else {
       car.pos.y = 0;
       car.vy = 0;
@@ -299,6 +337,7 @@ export class Action {
     car.roll = 0;
     car.visYaw = 0;
     car.pitch = 0;
+    if (car.manual) { this.landTricks(car, impact); return; }
     if (impact > 6) {
       s.fx.sparks.emit(car.pos.x, car.pos.y + 0.2, car.pos.z, 30, 0xffd27a, 8, 2);
       for (let k = 0; k < 6; k++) this.dust.emit(car.pos.x, car.pos.y, car.pos.z, 1.6);
@@ -310,6 +349,35 @@ export class Action {
     else if (car.stunt === 'spin') s.style.event(car, 'FLAT SPIN 360', 300, '#c77dff');
     if (big) s.style.event(car, `BIG AIR ${car.airT.toFixed(1)}s`, 200, '#08d9d6');
     if (car.stunt || big) { car.boost = Math.min(1, car.boost + 0.25); beep(900, 0.15, 'triangle', 0.2); }
+  }
+
+  /** Scores player tricks; landing far from wheels-down wrecks the car. */
+  landTricks(car, impact) {
+    const s = this.s;
+    car.manual = false;
+    const part = a => { const turns = Math.round(a / TAU); return { turns: Math.abs(turns), off: Math.abs(a - turns * TAU), dir: Math.sign(a) }; };
+    const f = part(car.flipA), sp = part(car.spinA), r = part(car.rollA);
+    if (f.off > 1.0 || r.off > 1.0 || sp.off > 1.3) {
+      s.hud.msg('BAD LANDING', 1.5, car.player, '#ff2e63');
+      this.wreck(car, null);
+      return;
+    }
+    if (impact > 6) {
+      s.fx.sparks.emit(car.pos.x, car.pos.y + 0.2, car.pos.z, 30, 0xffd27a, 8, 2);
+      for (let k = 0; k < 6; k++) this.dust.emit(car.pos.x, car.pos.y, car.pos.z, 1.6);
+      car.cam.shake = Math.max(car.cam.shake, Math.min(1, impact / 14));
+    }
+    let tricks = 0;
+    const name = (n, label) => `${MULTI[Math.min(n, 4)]}${label}`;
+    if (f.turns) { tricks += f.turns; s.style.event(car, name(f.turns, f.dir > 0 ? 'FRONT FLIP' : 'BACKFLIP'), 300 * f.turns, '#c77dff'); }
+    if (sp.turns) { tricks += sp.turns; s.style.event(car, `${sp.turns * 360} SPIN`, 220 * sp.turns, '#c77dff'); }
+    if (r.turns) { tricks += r.turns; s.style.event(car, name(r.turns, 'BARREL ROLL'), 320 * r.turns, '#c77dff'); }
+    if (car.airT > 0.9) s.style.event(car, `BIG AIR ${car.airT.toFixed(1)}s`, 200, '#08d9d6');
+    if (tricks >= 2) s.hud.center('INSANE!', 1, car.player);
+    if (tricks) {
+      car.boost = Math.min(1, car.boost + 0.2 * tricks);
+      beep(900 + tricks * 120, 0.18, 'triangle', 0.2);
+    }
   }
 
   // ---------- Crashes ----------
