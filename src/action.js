@@ -252,7 +252,7 @@ export class Action {
     // Chase the nearest human by track progress.
     let target = null, best = Infinity;
     for (const h of s.humans) {
-      if (h.finished || h.wreck > 0) continue;
+      if (h.finished || h.eliminated || h.wreck > 0) continue;
       const gap = h.progress - cop.progress;
       if (Math.abs(gap) < Math.abs(best)) { best = gap; target = h; }
     }
@@ -396,8 +396,8 @@ export class Action {
       car.airT = 0;
       car.vy = Math.min(14, car.vy * 1.35 + 2);
       car.airDur = (2 * car.vy) / GRAVITY + 0.3;
-      car.stuntDir = Math.random() < 0.5 ? -1 : 1;
-      car.stunt = car.lastRamp?.twist ? 'roll' : car.drifting || Math.abs(car.latSpeed) > 4 ? 'spin' : null;
+      // Ramps give clean jumps: no automatic rolls or spins. Players add their own tricks.
+      car.stunt = null;
       this.startTricks(car);
       // Stunt ramps throw players higher so there's time for tricks.
       if (car.manual && car.lastRamp?.twist) { car.vy += 3; car.airDur = (2 * car.vy) / GRAVITY + 0.3; }
@@ -632,7 +632,7 @@ export class Action {
     // Busted: pinned slow next to a cop.
     if (!this.cops.length) return;
     for (const h of s.humans) {
-      if (h.finished || h.wreck > 0 || h.busted > 0) continue;
+      if (h.finished || h.eliminated || h.wreck > 0 || h.busted > 0) continue;
       const pinned = h.speed < 7 && this.cops.some(c => !c.wreck && Math.hypot(c.pos.x - h.pos.x, c.pos.z - h.pos.z) < 7);
       h.bust = Math.max(0, (h.bust ?? 0) + (pinned ? dt : -dt * 0.6));
       if (h.bust >= BUST_TIME) {

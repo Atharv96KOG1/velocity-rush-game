@@ -172,6 +172,10 @@ Mix them for DOUBLE and TRIPLE combos; two or more in one jump shouts **INSANE!*
 - **Hands off = auto-level.** When you're not pressing a trick key, the car settles back to wheels-down on its own, so a plain jump always lands as a **PERFECT LANDING**.
 - **Still rotating at touchdown** gives a **SLOPPY LANDING**: you lose speed and score nothing, but you keep racing.
 
+**Finishing.** When you cross the line before the others, a **🏁 FINISHED** banner shows your place and the camera circles your car. Everyone still racing gets **30 seconds** to finish, with a countdown on screen; then the results appear.
+
+**Knockout.** The last car is eliminated each time the leader completes a lap. If you're knocked out, a **💀 ELIMINATED** banner appears and the camera follows the race leader until the knockout ends.
+
 **Respawn.** Crash and you're back on the road about 2.6 seconds later, upright, at 80 km/h. You blink and can't be hit for 2 seconds.
 
 **Mystery boxes.** Four rows of three spinning **?** boxes sit on every circuit and come back 4 seconds after they're hit. Drive through one with an empty slot to get a random item, then press `X` (P2: `'`, gamepad Y) to use it. Leaders mostly get defensive items; cars at the back get weapons and speed.
@@ -198,10 +202,10 @@ Rivals pick up and fire items too. Watch for **MISSILE INCOMING!**
 - The siren gets louder as cops close in, and the minimap shows them as flashing red and blue dots.
 
 **Ramps.** Each circuit has two jumps on its straights.
-- A cyan ramp gives a normal jump; land after more than 0.75 s in the air for **BIG AIR**.
-- A purple stunt ramp sends you into a **BARREL ROLL**.
-- Drifting as you leave any ramp turns the jump into a **FLAT SPIN 360**.
-- Each stunt tops up nitro, and hard landings throw sparks and dust.
+- Ramps give clean, level jumps. Cars never roll or spin by themselves; tricks are up to you.
+- A cyan ramp gives a normal jump. A purple stunt ramp throws you higher, with time for a double flip.
+- Land after a long jump for **BIG AIR**.
+- Hard landings throw sparks and dust.
 
 **Shockwave nitro.** Double-tap `Shift` with at least 40% nitro for a 1.8-second burst: +100 km/h top speed, purple flames, a sonic-boom ring and a camera kick. AI drivers use it too.
 

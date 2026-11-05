@@ -593,8 +593,9 @@ export class RaceSession {
     if (humansDone) { this.endIn(2.5); return; }
     if (this.order[0].finished) {
       if (this.dnf == null) {
-        this.dnf = 45;
-        this.hud.msg('LEADER FINISHED · 45s TO CROSS THE LINE', 3);
+        // Everyone still racing gets a fixed window to cross the line.
+        this.dnf = 30;
+        this.hud.msg(`${this.order[0].name.toUpperCase()} FINISHED · 30s TO CROSS THE LINE`, 3, null, '#ffd166');
       }
       this.dnf = Math.max(0, this.dnf - dt);
       if (this.dnf <= 0) this.endIn(0.5);
@@ -726,6 +727,11 @@ export class RaceSession {
     }
 
     this.humans.forEach((h, i) => {
+      // Knocked out: spectate whoever is leading instead of an empty, frozen view.
+      if (h.eliminated && this.state !== 'done') {
+        const lead = this.order.find(c => !c.eliminated);
+        if (lead && h.cam.car !== lead) { h.cam.car = lead; h.cam.ready = false; }
+      }
       const c = readControls(h.player, this.humans.length === 1);
       const prev = this.prevButtons[i];
       if (c.cam && !prev.cam) h.cam.cycle();
@@ -733,6 +739,12 @@ export class RaceSession {
       prev.cam = c.cam; prev.reset = c.reset;
 
       h.cam.update(dt);
+      // Crossed the line while others race on: a slow victory orbit around your car.
+      if (h.finished && !h.eliminated && this.state !== 'done') {
+        const t = this.time - h.finishTime, cam = h.cam.camera, a = h.yaw + Math.PI * 0.75 + t * 0.35;
+        cam.position.set(h.pos.x + Math.sin(a) * 9, h.pos.y + 3.2, h.pos.z + Math.cos(a) * 9);
+        cam.lookAt(h.pos.x, h.pos.y + 1, h.pos.z);
+      }
       if (h.kmh >= 300) unlock('speed300');
       h.engine.update(Math.abs(h.fwdSpeed) / h.spec.maxSpeed, h.input?.throttle ?? 0, h.nitroOn);
       this.hud.set(i, this.hudFor(h));
@@ -787,7 +799,13 @@ export class RaceSession {
     } else if (h.driftCombo > 150) {
       drift = `DRIFT +${Math.round(h.driftCombo)}`;
     }
-    return { pos, info: lines.join('\n'), drift, kmh: h.kmh, boost: h.boost, nitro: h.nitroOn, ...fxHud(h), item: this.items?.hud(h) };
+    let banner = '';
+    if (this.state !== 'done') {
+      if (h.eliminated) banner = `💀 ELIMINATED · SPECTATING ${(h.cam.car?.name ?? '').toUpperCase()}`;
+      else if (h.finished && !this.solo) banner = `🏁 FINISHED P${h.position}${this.dnf != null && this.state === 'race' ? ` · RESULTS IN ${Math.ceil(this.dnf)}s` : ' · WAITING FOR OTHERS'}`;
+      else if (this.dnf != null && this.state === 'race') banner = `⏱ ${Math.ceil(this.dnf)}s TO FINISH`;
+    }
+    return { pos, info: lines.join('\n'), drift, kmh: h.kmh, boost: h.boost, nitro: h.nitroOn, ...fxHud(h), item: this.items?.hud(h), banner };
   }
 
   dispose() {
