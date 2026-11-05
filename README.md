@@ -11,7 +11,7 @@ Story campaign · Meteor Storm · Mega Car · weapons & mystery boxes · jumps &
 ![No build step](https://img.shields.io/badge/build-none-3ddc84)
 ![Platform](https://img.shields.io/badge/platform-desktop%20browser-ff2e63)
 
-### [▶ Play now in your browser](https://atharv96kog1.github.io/velocity-rush-game/)
+### [▶ Play now in your browser](https://atharv96kog1.github.io/vrush/)
 
 <img src="docs/screenshots/harbor-loop.jpg" alt="Racing through Harbor Loop" width="100%">
 
@@ -91,7 +91,7 @@ Story campaign · Meteor Storm · Mega Car · weapons & mystery boxes · jumps &
 
 ## Quick start
 
-**Play online:** https://atharv96kog1.github.io/velocity-rush-game/. Nothing to install. Internet multiplayer works there too.
+**Play online:** https://atharv96kog1.github.io/vrush/. Nothing to install. Internet multiplayer works there too.
 
 The current version is shown in the bottom-right corner of the main menu.
 
@@ -101,8 +101,8 @@ The current version is shown in the bottom-right corner of the main menu.
 **Run locally** (needed for local-network multiplayer). Requires Python 3 and a modern desktop browser (Chrome, Edge, Firefox or Safari).
 
 ```bash
-git clone https://github.com/Atharv96KOG1/velocity-rush-game.git
-cd velocity-rush-game
+git clone https://github.com/Atharv96KOG1/vrush.git
+cd vrush
 python3 serve.py
 ```
 
