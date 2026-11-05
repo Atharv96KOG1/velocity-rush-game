@@ -3,7 +3,8 @@ const SECONDS = 8;        // how far back you can go
 export const REWINDS = 3; // uses per race
 
 const FIELDS = ['yaw', 'vx', 'vz', 'fwdSpeed', 'latSpeed', 'steerVis', 'lap', 'trackIndex', 'progress', 'boost',
-  'finished', 'finishTime', 'driftScore', 'lapStart', 'bestLap', 'turbo', 'shield', 'ghost', 'stun', 'padBoost', 'stuck'];
+  'finished', 'finishTime', 'driftScore', 'lapStart', 'bestLap', 'turbo', 'shield', 'ghost', 'stun', 'padBoost', 'stuck',
+  'shockNitro', 'air', 'vy', 'airT', 'roll', 'pitch', 'visYaw', 'wreck', 'busted', 'bust'];
 
 /** Ring buffer of race snapshots; holding the rewind key plays them back in reverse. */
 export class Rewind {

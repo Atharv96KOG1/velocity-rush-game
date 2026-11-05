@@ -47,7 +47,7 @@ export class ChaseCam {
       cam.position.z += (Math.random() - 0.5) * a;
     }
     cam.lookAt(this.look);
-    const fov = 60 + sp * 14 + (c.nitroOn ? 8 : 0) + (c.turbo > 0 ? 12 : 0);
+    const fov = 60 + sp * 14 + (c.nitroOn ? 8 : 0) + (c.turbo > 0 ? 12 : 0) + (c.shockNitro > 0 ? 16 : 0);
     if (Math.abs(cam.fov - fov) > 0.05) {
       cam.fov += (fov - cam.fov) * Math.min(1, dt * 4);
       cam.updateProjectionMatrix();

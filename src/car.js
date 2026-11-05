@@ -154,6 +154,11 @@ export class Car {
 
     this.draft = false;   // in another car's slipstream (set by StyleTracker)
     this.padBoost = 0;    // seconds of boost-pad thrust left
+    this.shockNitro = 0;  // seconds of shockwave-nitro burst left
+    this.visYaw = 0;      // extra visual spin for stunts (physics yaw unaffected)
+    this.vy = 0;          // vertical speed while airborne
+    this.air = false;
+    this.wreck = 0;       // seconds until a wrecked car respawns
     this.gripMul = 1;     // weather: wet roads lower grip
   }
 
@@ -186,12 +191,13 @@ export class Car {
     this.nitroOn = c.nitro && this.boost > 0.01 && c.throttle > 0 && fwd > 3;
     if (this.nitroOn) this.boost = Math.max(0, this.boost - dt * 0.3 / (1 + ((s.nitroMul ?? 1) - 1) * 0.5));
     this.padBoost = Math.max(0, this.padBoost - dt);
-    const maxV = s.maxSpeed * (0.4 + 0.6 * sf) + (this.nitroOn ? 16 : 0) + (this.turbo > 0 ? 25 : 0) + (this.draft ? 6 : 0) + (this.padBoost > 0 ? 20 : 0) - (this.stun > 0 ? s.maxSpeed * 0.5 : 0);
+    const maxV = s.maxSpeed * (0.4 + 0.6 * sf) + (this.nitroOn ? 16 : 0) + (this.turbo > 0 ? 25 : 0) + (this.draft ? 6 : 0) + (this.padBoost > 0 ? 20 : 0) + (this.shockNitro > 0 ? 28 : 0) - (this.stun > 0 ? s.maxSpeed * 0.5 : 0);
 
     if (c.throttle > 0 && fwd < maxV) {
       const r = Math.max(0, fwd) / maxV;
-      fwd += c.throttle * (s.accel + (this.nitroOn ? 18 : 0) + (this.turbo > 0 ? 34 : 0) + (this.draft ? 7 : 0) + (this.padBoost > 0 ? 30 : 0)) * (1 - r * r) * dt;
+      fwd += c.throttle * (s.accel + (this.nitroOn ? 18 : 0) + (this.turbo > 0 ? 34 : 0) + (this.draft ? 7 : 0) + (this.padBoost > 0 ? 30 : 0) + (this.shockNitro > 0 ? 45 : 0)) * (1 - r * r) * dt;
     }
+    this.shockNitro = Math.max(0, this.shockNitro - dt);
     this.braking = c.brake > 0 && fwd > 1;
     if (c.brake > 0) {
       if (fwd > 1) fwd -= 42 * c.brake * dt;
@@ -234,7 +240,7 @@ export class Car {
   syncMesh() {
     const m = this.mesh;
     m.position.copy(this.pos);
-    m.rotation.set(this.pitch, this.yaw, this.roll, 'YXZ');
+    m.rotation.set(this.pitch, this.yaw + this.visYaw, this.roll, 'YXZ');
     const p = this.parts;
     p.chassis.rotation.z = THREE.MathUtils.clamp(this.latSpeed * 0.012, -0.08, 0.08);
     p.chassis.rotation.x = this.braking ? 0.025 : 0;
@@ -242,11 +248,11 @@ export class Car {
       w.spin.rotation.x = this.spin;
       if (w.front) w.pivot.rotation.y = this.steerVis * 0.45;
     }
-    const fire = this.nitroOn || this.turbo > 0 || this.padBoost > 0;
+    const fire = this.nitroOn || this.turbo > 0 || this.padBoost > 0 || this.shockNitro > 0;
     p.flame.visible = fire;
     if (fire) {
       p.flame.scale.setScalar((this.turbo > 0 ? 1.6 : 0.8) + Math.random() * 0.5);
-      p.flame.material.color.set(this.turbo > 0 ? 0xffb703 : 0x66d9ff);
+      p.flame.material.color.set(this.shockNitro > 0 ? 0xc77dff : this.turbo > 0 ? 0xffb703 : 0x66d9ff);
     }
     p.tailMat.emissiveIntensity = this.braking ? 4 : 1.2;
   }

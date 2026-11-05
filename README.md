@@ -3,7 +3,7 @@
 # 🏁 Velocity Rush
 
 **A fast 3D arcade racer that runs in your browser.**
-Story campaign · team races · online multiplayer · open world · super powers · weather · rewind · photo mode
+Story campaign · team races · police chases · takedowns · stunts · online multiplayer · open world · super powers
 
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES2022-f7df1e?logo=javascript&logoColor=black)
 ![Three.js](https://img.shields.io/badge/Three.js-r169-000000?logo=threedotjs&logoColor=white)
@@ -26,6 +26,7 @@ Story campaign · team races · online multiplayer · open world · super powers
 - [Quick start](#quick-start)
 - [Game modes](#game-modes)
 - [Super powers](#super-powers)
+- [Takedowns, stunts and police](#takedowns-stunts-and-police)
 - [Style, weather and ghosts](#style-weather-and-ghosts)
 - [Rewind, photo mode and soundtrack](#rewind-photo-mode-and-soundtrack)
 - [Controls](#controls)
@@ -39,6 +40,10 @@ Story campaign · team races · online multiplayer · open world · super powers
 - **Tuned arcade handling.** 120 Hz fixed-step physics with grip, slip-angle limited drifting, nitro and slope gravity.
 - **Eight modes.** Story campaign, quick race, knockout, challenges, open world, split-screen and online play.
 - **1v1, 2v2, 3v3 and 6-car free-for-all**, with team scoring and AI teammates or rivals.
+- **Takedowns.** Slam a rival into the wall and the game drops into a slow-motion crash cam while the wreck tumbles and scatters debris.
+- **Police in races.** Cop cars with glowing lightbars and sirens hunt you down. They ram you, block your lane, and BUST you if you get pinned.
+- **Ramps and stunts.** Every circuit has jumps. Hit them for BIG AIR, barrel rolls and flat spins.
+- **Shockwave nitro.** Double-tap nitro for a huge burst with a sonic-boom ring and a camera kick.
 - **Six unlockable super powers**, used by AI rivals too.
 - **Style system.** Near misses, slipstreaming, overtakes and drift chains build a combo of up to x5 that refills nitro and pays credits.
 - **Dynamic weather.** Clear, sunset, fog or rain. Rain brings a wet, reflective track, lower grip, spray and lightning.
@@ -57,6 +62,13 @@ Story campaign · team races · online multiplayer · open world · super powers
 ## Screenshots
 
 <table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/takedown.jpg" alt="Slow-motion takedown crash cam"><br><sub><b>Takedown</b>: slow-motion crash cam, debris and sparks</sub></td>
+    <td width="50%"><img src="docs/screenshots/barrel-roll.jpg" alt="Barrel roll off a stunt ramp"><br><sub><b>Stunt ramp</b>: barrel roll mid-air</sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/screenshots/countdown-flyby.jpg" alt="Countdown camera flyby over the grid"><br><sub><b>Countdown flyby</b>: the camera sweeps over the grid before the start</sub></td>
+  </tr>
   <tr>
     <td colspan="2"><img src="docs/screenshots/photo-mode.jpg" alt="Photo mode at sunset in Red Canyon"><br><sub><b>Photo mode</b>: clear-coated car at sunset in Red Canyon</sub></td>
   </tr>
@@ -124,6 +136,27 @@ Unlock powers with credits on the **Super Powers** screen and equip one. The met
 | 🌀 | **EMP Pulse** | Stalls every rival within 110 m for 2.5 s | 20 s |
 | ✦ | **Blink** | Teleports 45 m ahead along the road | 22 s |
 
+## Takedowns, stunts and police
+
+**Takedowns.** Hit a rival hard, or push them into a wall within 1.5 seconds of contact, and they're wrecked. Time slows to a quarter speed, the camera orbits the tumbling car, and debris and sparks fly. You score **TAKEDOWN** (+400) and a big nitro refill; wrecked cars respawn after a few seconds. Crash into a wall hard enough yourself and *you* get **WRECKED**.
+
+**Police.** Turn on **Police** in Quick Race, or play story chapter 5 or the *Hot Pursuit* and *Wrecking Crew* challenges.
+- Two cop cars (three on hard) start behind the grid. They're faster than any car in the garage.
+- When you're ahead, they hunt you and ram you. When you're behind them, they slow down and block your lane.
+- If a cop pins you below 25 km/h for about 2 seconds, you're **BUSTED** and held for 3 seconds.
+- Taking down a cop scores **COP TAKEDOWN** (+600). Cops come back behind you a few seconds later.
+- The siren gets louder as cops close in, and the minimap shows them as flashing red and blue dots.
+
+**Ramps.** Each circuit has two jumps on its straights.
+- A cyan ramp gives a normal jump; land after more than 0.75 s in the air for **BIG AIR**.
+- A purple stunt ramp sends you into a **BARREL ROLL**.
+- Drifting as you leave any ramp turns the jump into a **FLAT SPIN 360**.
+- Each stunt tops up nitro, and hard landings throw sparks and dust.
+
+**Shockwave nitro.** Double-tap `Shift` with at least 40% nitro for a 1.8-second burst: +100 km/h top speed, purple flames, a sonic-boom ring and a camera kick. AI drivers use it too.
+
+**Cinematics.** The camera sweeps over the grid during the countdown and settles behind your car at GO. Cars kick up dust off the tarmac.
+
 ## Style, weather and ghosts
 
 **Style points.** Every trick tops up nitro, and your style total turns into bonus credits at the end of the race. Land the next trick within 3 seconds to raise the combo, up to x5.
@@ -167,7 +200,7 @@ Unlock powers with credits on the **Super Powers** screen and equip one. The met
 | Brake / reverse | `S` | `↓` | LT |
 | Steer | `A` `D` | `←` `→` | Left stick |
 | Handbrake / drift | `Space` | `/` or `Right Ctrl` | A |
-| Nitro | `Left Shift` | `Right Shift` | X / B |
+| Nitro (double-tap: shockwave) | `Left Shift` | `Right Shift` | X / B |
 | Super power | `E` | `Enter` | LB |
 | Reset to road | `R` | `Backspace` | Y |
 | Camera (chase / far / hood) | `C` | `.` | RB |
@@ -219,6 +252,7 @@ velocity-rush/
     ├── weather.js        Weather themes, fog ranges, rain particles and lightning
     ├── ghost.js          Ghost run recording and playback
     ├── achieve.js        Achievement unlocks and toast notifications
+    ├── action.js         Takedowns and crash cam, police, ramps and stunts, shockwave nitro, countdown flyby, dust
     ├── rewind.js         Snapshot ring buffer for rewinding races
     ├── photo.js          Photo mode orbit camera and PNG export
     ├── music.js          Procedural synthwave soundtrack

@@ -56,7 +56,7 @@ export class AIDriver {
     }
     this.bend = bend;
     const skill = this.skill * this.rubber;
-    const target = c.spec.maxSpeed * Math.min(1.05, skill) * (1 - Math.min(0.62, bend * 0.5)) * (0.95 + 0.05 * skill);
+    const target = c.spec.maxSpeed * Math.min(this.cap ?? 1.05, skill) * (1 - Math.min(0.62, bend * 0.5)) * (0.95 + 0.05 * skill);
 
     const throttle = spd < target ? 1 : 0;
     const brake = spd > target + 3 ? Math.min(1, (spd - target) / 10) : 0;

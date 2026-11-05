@@ -96,7 +96,7 @@ export class UI {
 
   showSetup(humans) {
     this.toMenu();
-    const st = this.setupState ??= { track: 'harbor', format: '1v1', laps: 3, diff: 'normal', coop: false, mode: 'race', p2car: save.owned[0], powers: 'on', p2power: save.powers[0], weather: 'clear' };
+    const st = this.setupState ??= { track: 'harbor', format: '1v1', laps: 3, diff: 'normal', coop: false, mode: 'race', p2car: save.owned[0], powers: 'on', p2power: save.powers[0], weather: 'clear', police: 'off' };
     if (!save.owned.includes(st.p2car)) st.p2car = save.owned[0];
     if (!save.powers.includes(st.p2power)) st.p2power = save.powers[0];
     if (humans === 1 || st.format === '1v1') st.coop = false;
@@ -124,6 +124,8 @@ export class UI {
       <div class="chips">${chips('weather', Object.keys(WEATHER), v => `${WEATHER[v].icon} ${WEATHER[v].label}`)}</div>
       <div class="label">Super Powers</div>
       <div class="chips">${chips('powers', ['on', 'off'], v => v === 'on' ? `ON · ${powerById(save.power).icon} ${powerById(save.power).name}` : 'OFF')}</div>
+      <div class="label">Police</div>
+      <div class="chips">${chips('police', ['off', 'on'], v => v === 'on' ? '🚨 COPS CHASE YOU' : 'NO POLICE')}</div>
       ${humans === 2 && st.powers === 'on' ? `<div class="label">P2 Power</div><div class="chips">${save.powers.map(id => `<button class="chip ${st.p2power === id ? 'on' : ''}" data-k="p2power" data-v="${id}">${powerById(id).icon} ${powerById(id).name}</button>`).join('')}</div>` : ''}
       ${st.mode === 'race' ? `<div class="label">Laps</div><div class="chips">${chips('laps', [1, 2, 3, 5])}</div>` : ''}
       <div class="label">AI Difficulty</div>
@@ -149,7 +151,7 @@ export class UI {
         title: humans === 2 ? 'Local Multiplayer' : 'Quick Race',
         type: st.mode, track: st.track, format: st.format,
         laps: st.mode === 'knockout' ? 6 : st.laps,
-        difficulty: DIFFICULTY[st.diff], humans: players, coop: st.coop, powers: st.powers === 'on', weather: st.weather,
+        difficulty: DIFFICULTY[st.diff], humans: players, coop: st.coop, powers: st.powers === 'on', weather: st.weather, police: st.police === 'on',
       });
     };
   }
@@ -353,7 +355,7 @@ export class UI {
       <div class="h2" style="margin-top:10px">${s.title}</div>
       <div class="speaker">${s.speaker}</div>
       <div class="quote">“${s.text}”</div>
-      <div class="goal">🎯 ${goalLine(s.goal, s)}<br>◆ Reward ${s.reward.toLocaleString()} CR${s.type === 'race' || s.type === 'knockout' ? `<br>${powerById(save.power).icon} Super powers ON — rivals have them too. Press E.` : ''}</div>
+      <div class="goal">🎯 ${goalLine(s.goal, s)}${s.police ? '<br>🚨 Police will hunt you. Don\'t get pinned, or you\'re BUSTED.' : ''}<br>◆ Reward ${s.reward.toLocaleString()} CR${s.type === 'race' || s.type === 'knockout' ? `<br>${powerById(save.power).icon} Super powers ON — rivals have them too. Press E.` : ''}</div>
       <div class="row"><button class="btn primary inline" data-start>Start</button><button class="btn inline" data-go="showStory">Back</button></div>
     </div></div>`);
     node.querySelector('[data-start]').onclick = () => this.startRace(this.eventCfg(s, { storyIndex: i, title: `Chapter ${i + 1}: ${s.title}` }));
@@ -362,7 +364,7 @@ export class UI {
   eventCfg(s, extra) {
     return {
       type: s.type, track: s.track, format: s.format ?? 'ffa', laps: s.laps, difficulty: s.difficulty ?? 1,
-      goal: s.goal, reward: s.reward, rival: s.rival, weather: s.weather ?? 'clear',
+      goal: s.goal, reward: s.reward, rival: s.rival, weather: s.weather ?? 'clear', police: !!s.police,
       humans: [{ car: save.car, name: 'YOU', power: save.power, color: paintOf(save.car), tune: tuneOf(save.car) }],
       powers: s.type === 'race' || s.type === 'knockout', ...extra,
     };
